@@ -6,12 +6,12 @@ namespace MawMediaPublisher.Exif;
 
 class ExifExporter
 {
-    public async Task<JsonElement> Export(FileInfo file)
+    public async Task<ExifInfo> Export(FileInfo file)
     {
         return await ExtractExif(file);
     }
 
-    async Task<JsonElement> ExtractExif(FileInfo file)
+    async Task<ExifInfo> ExtractExif(FileInfo file)
     {
         using var cmd = Cli
             .Wrap("exiftool")
@@ -45,12 +45,12 @@ class ExifExporter
                 throw new ApplicationException($"Only expected a single result when parsing exif for: {file.FullName}.  Count was: {exif.RootElement.EnumerateArray().Count()}");
             }
 
-            return exif.RootElement.EnumerateArray().First();
+            return new ExifInfo(exif.RootElement.EnumerateArray().First());
         }
 
         if (exif.RootElement.ValueKind == JsonValueKind.Object)
         {
-            return exif.RootElement;
+            return new ExifInfo(exif.RootElement);
         }
 
         throw new ApplicationException($"Did not find expected json result when parsing exif for: {file.FullName}");
