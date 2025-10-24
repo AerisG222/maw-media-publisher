@@ -6,7 +6,4 @@ public class Constants
     public const string NEF = "/home/mmorano/maw-media-publisher/DSC_1812.NEF";
     public const string JPG = "/home/mmorano/maw-media-publisher/PXL_20251004_183057915.jpg";
     public const string MP4 = "/home/mmorano/maw-media-publisher/PXL_20251003_234402018.mp4";
-
-    public const string TAG_IMAGE_HEIGHT = "ImageHeight";
-    public const string TAG_IMAGE_WIDTH = "ImageWidth";
 }
