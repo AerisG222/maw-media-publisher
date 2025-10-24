@@ -123,6 +123,41 @@ public class MediaFinderTets
         var results = mf.BuildMediaFiles(files);
 
         Assert.Single(results.Media);
+
+        var media = results.Media.First();
+
+        Assert.Equal(nef, media.OriginalFilepath);
+        Assert.Equal(dng, media.ProcessingFilepath);
+        Assert.Equal(pp3, media.SupportFilepath);
+
+        Assert.Single(results.Unknown);
+        Assert.Equal(nefpp3, results.Unknown.First());
+    }
+
+    [Fact]
+    public void MediaFinder_ImageAndDngAndSourceSupportFile_AreLinked()
+    {
+        var mf = new MediaFinder();
+        var nef = "/a/b/DSC_123.NEF";
+        var nefpp3 = "/a/b/DSC_123.NEF.pp3";
+        var dng = "/a/b/DSC_123.dng";
+
+        string[] files = [
+            nef,
+            nefpp3,
+            dng
+        ];
+
+        var results = mf.BuildMediaFiles(files);
+
+        Assert.Single(results.Media);
+
+        var media = results.Media.First();
+
+        Assert.Equal(nef, media.OriginalFilepath);
+        Assert.Equal(dng, media.ProcessingFilepath);
+        Assert.Null(media.SupportFilepath);
+
         Assert.Single(results.Unknown);
         Assert.Equal(nefpp3, results.Unknown.First());
     }
