@@ -1,5 +1,5 @@
 using System.Text.Json;
-using MawMediaPublisher.Exif;
+using MawMediaPublisher.Metadata;
 
 namespace MawMediaPublisher.Tests;
 

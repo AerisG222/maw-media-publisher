@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace MawMediaPublisher.Exif;
+namespace MawMediaPublisher.Metadata;
 
 public class ExifInfo
 {

@@ -1,7 +1,7 @@
 using CliWrap;
 using CliWrap.Buffered;
 
-namespace MawMediaPublisher.Exif;
+namespace MawMediaPublisher.Metadata;
 
 class DurationInspector
 {

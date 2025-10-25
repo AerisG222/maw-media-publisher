@@ -1,5 +1,5 @@
 using System.ComponentModel;
-using MawMediaPublisher.Exif;
+using MawMediaPublisher.Metadata;
 using MawMediaPublisher.Finder;
 using MawMediaPublisher.Models;
 using Spectre.Console;
