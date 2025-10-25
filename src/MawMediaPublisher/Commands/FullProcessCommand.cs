@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using MawMediaPublisher.Exif;
 using MawMediaPublisher.Finder;
 using MawMediaPublisher.Models;
 using Spectre.Console;
@@ -11,6 +12,10 @@ internal sealed class FullProcessCommand
 {
     const int STATUS_SUCCESS = 0;
     const int STATUS_USER_CANCELLED = 1;
+
+    static readonly MediaFinder _mediaFinder = new();
+    static readonly ExifExporter _exifExporter = new();
+    static readonly DurationInspector _durationInspector = new();
     static readonly Lock _lock = new();
 
     public sealed class Settings
@@ -50,8 +55,7 @@ internal sealed class FullProcessCommand
             return STATUS_USER_CANCELLED;
         }
 
-        var mediaFinder = new MediaFinder();
-        var foundFiles = mediaFinder.FindMedia(category.SourceDirectory);
+        var foundFiles = _mediaFinder.FindMedia(category.SourceDirectory);
 
         if (settings.Interactive && !PrintMediaToProcessAndContinue(foundFiles))
         {
@@ -102,7 +106,14 @@ internal sealed class FullProcessCommand
 
     static async Task ProcessMedia(MediaFile file)
     {
-        await Task.Delay(1000);
+        var origFile = new FileInfo(file.OriginalFilepath);
+
+        file.Exif = await _exifExporter.Export(origFile);
+
+        if (file.MediaType == MediaType.Video)
+        {
+            file.VideoDuration = await _durationInspector.Inspect(origFile);
+        }
     }
 
     static bool PrintParametersAndContinue(Category category)

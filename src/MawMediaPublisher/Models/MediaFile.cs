@@ -1,3 +1,5 @@
+using MawMediaPublisher.Exif;
+
 namespace MawMediaPublisher.Models;
 
 public class MediaFile
@@ -6,6 +8,8 @@ public class MediaFile
     public MediaType MediaType { get; private set; }
     public string? ProcessingFilepath { get; set; }
     public string? SupportFilepath { get; set; }
+    public ExifInfo? Exif { get; set; }
+    public float? VideoDuration { get; set; }
 
     public MediaFile(string file, MediaType type)
     {
