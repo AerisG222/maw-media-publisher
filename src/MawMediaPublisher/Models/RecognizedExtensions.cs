@@ -2,6 +2,11 @@ namespace MawMediaPublisher.Models;
 
 public static class RecognizedExtensions
 {
+    public static readonly string[] RawFileExtensions = [
+        ".DNG",
+        ".NEF",
+    ];
+
     public static readonly string[] SourceImageExtensions = [
         ".AVIF",
         ".HEIC",
@@ -30,6 +35,9 @@ public static class RecognizedExtensions
         EXT_DNG,
         EXT_PP3
     ];
+
+    public static bool IsRaw(string file) =>
+        RawFileExtensions.Contains(Path.GetExtension(file)?.ToUpper());
 
     public static bool IsDng(string file) =>
         string.Equals(EXT_DNG, Path.GetExtension(file)?.ToUpper());

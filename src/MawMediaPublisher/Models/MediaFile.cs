@@ -1,4 +1,5 @@
 using MawMediaPublisher.Metadata;
+using MawMediaPublisher.Scale;
 
 namespace MawMediaPublisher.Models;
 
@@ -10,6 +11,7 @@ public class MediaFile
     public string? SupportFilepath { get; set; }
     public ExifInfo? Exif { get; set; }
     public float? VideoDuration { get; set; }
+    public IEnumerable<ScaledFile> ScaledFiles { get; set; } = [];
 
     public MediaFile(string file, MediaType type)
     {

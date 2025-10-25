@@ -4,6 +4,7 @@ using MawMediaPublisher.Finder;
 using MawMediaPublisher.Models;
 using Spectre.Console;
 using Spectre.Console.Cli;
+using MawMediaPublisher.Scale;
 
 namespace MawMediaPublisher.Commands;
 
@@ -16,6 +17,7 @@ internal sealed class FullProcessCommand
     static readonly MediaFinder _mediaFinder = new();
     static readonly ExifExporter _exifExporter = new();
     static readonly DurationInspector _durationInspector = new();
+    static readonly MediaScaler _mediaScaler = new();
     static readonly Lock _lock = new();
 
     public sealed class Settings
@@ -110,10 +112,17 @@ internal sealed class FullProcessCommand
 
         file.Exif = await _exifExporter.Export(origFile);
 
+        if (file.Exif == null)
+        {
+            throw new ApplicationException("Exif data is required!");
+        }
+
         if (file.MediaType == MediaType.Video)
         {
             file.VideoDuration = await _durationInspector.Inspect(origFile);
         }
+
+        file.ScaledFiles = await _mediaScaler.ScaleMedia(file);
     }
 
     static bool PrintParametersAndContinue(Category category)
