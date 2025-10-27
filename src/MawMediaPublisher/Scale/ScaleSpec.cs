@@ -8,6 +8,8 @@ public record class ScaleSpec(
     bool IsPoster
 )
 {
+    public static readonly ScaleSpec Src = new("src", int.MaxValue, int.MaxValue, false, false);
+
     static readonly ScaleSpec[] _allScales = [
         new ("qqvg",             160,  120, false, false),
         new ("qqvg",             160,  120, false, true),

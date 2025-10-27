@@ -7,12 +7,23 @@ class MediaScaler
     readonly PhotoScaler _photoScaler = new();
     readonly VideoScaler _videoScaler = new();
 
-    public async Task<IEnumerable<ScaledFile>> ScaleMedia(MediaFile file)
+    public async Task<IEnumerable<ScaledFile>> ScaleMedia(Category category, MediaFile file)
     {
         var results = new List<ScaledFile>();
         var srcFile = new FileInfo(file.ProcessingFilepath ?? file.OriginalFilepath);
         var origDir = srcFile.Directory!;
         var scales = GetScalesForDimensions(file.Exif!.Width, file.Exif.Height, file.MediaType == MediaType.Video);
+
+        var origFile = new FileInfo(file.OriginalFilepath);
+
+        results.Add(new ScaledFile(
+            Guid.CreateVersion7(),
+            ScaleSpec.Src,
+            category.BuildMediaFilePath(ScaleSpec.Src, origFile.Name),
+            file.Exif.Width,
+            file.Exif.Height,
+            origFile.Length
+        ));
 
         foreach (var scale in scales)
         {
@@ -23,10 +34,10 @@ class MediaScaler
             switch (file.MediaType)
             {
                 case MediaType.Image:
-                    results.Add(await _photoScaler.Scale(srcFile, scaleDir, scale));
+                    results.Add(await _photoScaler.Scale(category, srcFile, scaleDir, scale));
                     break;
                 case MediaType.Video:
-                    results.Add(await _videoScaler.Scale(srcFile, scaleDir, scale));
+                    results.Add(await _videoScaler.Scale(category, srcFile, scaleDir, scale));
                     break;
             }
         }

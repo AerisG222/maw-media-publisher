@@ -1,5 +1,6 @@
 using MawMediaPublisher.Finder;
 using MawMediaPublisher.Metadata;
+using MawMediaPublisher.Models;
 using MawMediaPublisher.Scale;
 
 namespace MawMediaPublisher.Tests;
@@ -13,13 +14,14 @@ public class ScaleTests
         var ee = new ExifExporter();
         var ms = new MediaScaler();
         var fi = new FileInfo(Constants.NEF);
+        var category = new Category("category-name", "/my/src/dir/awesome-photos", DateTime.Now, "admin friend");
 
         var results = mf.FindMedia(fi.DirectoryName!);
 
         foreach (var media in results.Media)
         {
             media.Exif = await ee.Export(new FileInfo(media.OriginalFilepath));
-            var scaleResult = await ms.ScaleMedia(media);
+            var scaleResult = await ms.ScaleMedia(category, media);
 
             Assert.NotNull(scaleResult);
         }

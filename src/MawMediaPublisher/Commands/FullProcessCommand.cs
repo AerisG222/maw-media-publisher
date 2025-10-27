@@ -1,10 +1,11 @@
 using System.ComponentModel;
+using Spectre.Console;
+using Spectre.Console.Cli;
 using MawMediaPublisher.Metadata;
 using MawMediaPublisher.Finder;
 using MawMediaPublisher.Models;
-using Spectre.Console;
-using Spectre.Console.Cli;
 using MawMediaPublisher.Scale;
+using MawMediaPublisher.Sql;
 
 namespace MawMediaPublisher.Commands;
 
@@ -18,6 +19,8 @@ internal sealed class FullProcessCommand
     static readonly ExifExporter _exifExporter = new();
     static readonly DurationInspector _durationInspector = new();
     static readonly MediaScaler _mediaScaler = new();
+    static readonly SqlWriter _sqlWriter = new();
+    static readonly ScriptWriter _scriptWriter = new();
     static readonly Lock _lock = new();
 
     public sealed class Settings
@@ -36,6 +39,11 @@ internal sealed class FullProcessCommand
         [Description("Effective date, in (yyyy-mm-dd) format, to use for this category.  Defaults to now.")]
         public DateTime EffectiveDate { get; init; } = DateTime.Now;
 
+        [CommandOption("-r|--roles", false)]
+        [Description("Space delimited list of roles that should have access to the category")]
+        [DefaultValue("admin friend")]
+        public string Roles { get; init; } = "admin friend";
+
         [CommandOption("-i|--interactive", false)]
         [Description("Interactive mode - illustrate steps and prompt to continue before executing anything.")]
         public bool Interactive { get; init; }
@@ -49,7 +57,8 @@ internal sealed class FullProcessCommand
         var category = new Category(
             settings.CategoryName,
             settings.MediaPath,
-            settings.EffectiveDate
+            settings.EffectiveDate,
+            settings.Roles
         );
 
         if (settings.Interactive && !PrintParametersAndContinue(category))
@@ -67,6 +76,15 @@ internal sealed class FullProcessCommand
         category.Media = foundFiles.Media;
 
         await ProcessCategoryMedia(category);
+
+        AnsiConsole.MarkupLine("[yellow]** All files have been processed.  Please review to make sure they came out as expected.[/]");
+
+        if (!ContinuePrompt())
+        {
+            return STATUS_USER_CANCELLED;
+        }
+
+
 
         return STATUS_SUCCESS;
     }
@@ -96,17 +114,19 @@ internal sealed class FullProcessCommand
 
                 await Parallel.ForEachAsync(category.Media, opts, async (media, token) =>
                 {
-                    await ProcessMedia(media);
+                    await ProcessMedia(category, media);
 
                     lock (_lock)
                     {
                         task.Increment(pctPerFile);
                     }
                 });
+
+                await GenerateSql(category);
             });
     }
 
-    static async Task ProcessMedia(MediaFile file)
+    static async Task ProcessMedia(Category category, MediaFile file)
     {
         var origFile = new FileInfo(file.OriginalFilepath);
 
@@ -122,7 +142,13 @@ internal sealed class FullProcessCommand
             file.VideoDuration = await _durationInspector.Inspect(origFile);
         }
 
-        file.ScaledFiles = await _mediaScaler.ScaleMedia(file);
+        file.ScaledFiles = await _mediaScaler.ScaleMedia(category, file);
+    }
+
+    static async Task GenerateSql(Category category)
+    {
+        await _sqlWriter.GenerateSql(category);
+        await _scriptWriter.WriteRunnerScript(category);
     }
 
     static bool PrintParametersAndContinue(Category category)

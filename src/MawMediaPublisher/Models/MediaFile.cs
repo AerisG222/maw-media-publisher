@@ -5,6 +5,7 @@ namespace MawMediaPublisher.Models;
 
 public class MediaFile
 {
+    public Guid Id { get; } = Guid.CreateVersion7();
     public string OriginalFilepath { get; private set; }
     public MediaType MediaType { get; private set; }
     public string? ProcessingFilepath { get; set; }

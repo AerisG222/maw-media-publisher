@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 namespace MawMediaPublisher.Metadata;
@@ -6,10 +7,16 @@ public class ExifInfo
 {
     const string TAG_IMAGE_HEIGHT = "ImageHeight";
     const string TAG_IMAGE_WIDTH = "ImageWidth";
+    const string TAG_CREATE_DATE = "CreateDate";
+    const string TAG_GPS_LATITUDE = "GPSLatitude";
+    const string TAG_GPS_LONGITUDE = "GPSLongitude";
 
     public JsonElement Json { get; init; }
-    int _height = -1;
-    int _width = -1;
+    int _height = int.MinValue;
+    int _width = int.MinValue;
+    decimal? _latitude = null;
+    decimal? _longitude = null;
+    DateTime _createDate = DateTime.MinValue;
 
     public ExifInfo(JsonElement json)
     {
@@ -20,12 +27,12 @@ public class ExifInfo
     {
         get
         {
-            if (_height != -1)
+            if (_height != int.MinValue)
             {
                 return _height;
             }
 
-            _height = GetIntValue(FindFirstPropertyByName(Json, TAG_IMAGE_HEIGHT));
+            _height = GetIntFromVal(FindFirstPropertyByName(Json, TAG_IMAGE_HEIGHT));
 
             return _height;
         }
@@ -35,14 +42,59 @@ public class ExifInfo
     {
         get
         {
-            if (_width != -1)
+            if (_width != int.MinValue)
             {
                 return _width;
             }
 
-            _width = GetIntValue(FindFirstPropertyByName(Json, TAG_IMAGE_WIDTH));
+            _width = GetIntFromVal(FindFirstPropertyByName(Json, TAG_IMAGE_WIDTH));
 
             return _width;
+        }
+    }
+
+    public DateTime CreateDate
+    {
+        get
+        {
+            if (_createDate != DateTime.MinValue)
+            {
+                return _createDate;
+            }
+
+            _createDate = GetDateTimeFromVal(FindFirstPropertyByName(Json, TAG_CREATE_DATE));
+
+            return _createDate;
+        }
+    }
+
+    public decimal? Latitude
+    {
+        get
+        {
+            if (_latitude != null)
+            {
+                return _latitude;
+            }
+
+            _latitude = GetDecimalFromNum(FindFirstPropertyByName(Json, TAG_GPS_LATITUDE));
+
+            return _latitude;
+        }
+    }
+
+    public decimal? Longitude
+    {
+        get
+        {
+            if (_longitude != null)
+            {
+                return _longitude;
+            }
+
+            _longitude = GetDecimalFromNum(FindFirstPropertyByName(Json, TAG_GPS_LONGITUDE));
+
+            return _longitude;
         }
     }
 
@@ -82,11 +134,11 @@ public class ExifInfo
         return null;
     }
 
-    private static int GetIntValue(JsonElement? prop)
+    private static int GetIntFromVal(JsonElement? prop)
     {
         if (prop == null)
         {
-            return default;
+            return int.MinValue;
         }
 
         var valElem = prop.Value.ValueKind == JsonValueKind.Object && prop.Value.TryGetProperty("val", out var v)
@@ -98,6 +150,53 @@ public class ExifInfo
             return i;
         }
 
-        return default;
+        return int.MinValue;
+    }
+
+    private static DateTime GetDateTimeFromVal(JsonElement? prop)
+    {
+        if (prop == null)
+        {
+            return DateTime.MinValue;
+        }
+
+        var valElem = prop.Value.ValueKind == JsonValueKind.Object && prop.Value.TryGetProperty("val", out var v)
+            ? v
+            : default;
+
+        if (
+            valElem.ValueKind == JsonValueKind.String &&
+            DateTime.TryParseExact(
+                valElem.GetString(),
+                "yyyy:MM:dd HH:mm:ss",
+                DateTimeFormatInfo.CurrentInfo,
+                DateTimeStyles.AllowWhiteSpaces,
+                out DateTime dt
+            )
+        )
+        {
+            return dt;
+        }
+
+        return DateTime.MinValue;
+    }
+
+    private static decimal? GetDecimalFromNum(JsonElement? prop)
+    {
+        if (prop == null)
+        {
+            return null;
+        }
+
+        var valElem = prop.Value.ValueKind == JsonValueKind.Object && prop.Value.TryGetProperty("num", out var v)
+            ? v
+            : default;
+
+        if (valElem.ValueKind == JsonValueKind.Number && valElem.TryGetDecimal(out var d))
+        {
+            return d;
+        }
+
+        return null;
     }
 }

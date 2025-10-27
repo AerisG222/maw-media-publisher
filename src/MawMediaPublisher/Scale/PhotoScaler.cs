@@ -9,6 +9,7 @@ class PhotoScaler
     ExifExporter _exifExporter = new();
 
     public async Task<ScaledFile> Scale(
+        Category category,
         FileInfo src,
         string dstDir,
         ScaleSpec scale
@@ -38,7 +39,14 @@ class PhotoScaler
 
         dst.Refresh();
 
-        return new ScaledFile(scale, dst.FullName, exif!.Width, exif.Height, dst.Length);
+        return new ScaledFile(
+            Guid.CreateVersion7(),
+            scale,
+            category.BuildMediaFilePath(ScaleSpec.Src, dst.Name),
+            exif!.Width,
+            exif.Height,
+            dst.Length
+        );
     }
 
     static async Task ScaleImage(FileInfo src, FileInfo dst, ScaleSpec scale)
