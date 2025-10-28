@@ -14,7 +14,14 @@ public class ScaleTests
         var ee = new ExifExporter();
         var ms = new MediaScaler();
         var fi = new FileInfo(Constants.NEF);
-        var category = new Category("category-name", "/my/src/dir/awesome-photos", DateTime.Now, "admin friend");
+        var category = new Category(
+            "category-name",
+            "/my/src/dir/awesome-photos",
+            DateTime.Now,
+            "admin friend",
+            "/data/local",
+            "/data/remote"
+        );
 
         var results = mf.FindMedia(fi.DirectoryName!);
 

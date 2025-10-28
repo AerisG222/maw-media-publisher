@@ -42,7 +42,7 @@ class PhotoScaler
         return new ScaledFile(
             Guid.CreateVersion7(),
             scale,
-            category.BuildMediaFilePath(ScaleSpec.Src, dst.Name),
+            category.BuildMediaFilePath(scale, dst.Name),
             exif!.Width,
             exif.Height,
             dst.Length

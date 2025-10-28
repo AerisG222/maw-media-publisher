@@ -1,4 +1,7 @@
 using System.ComponentModel;
+using System.IO.Compression;
+using CliWrap;
+using CliWrap.Buffered;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using MawMediaPublisher.Metadata;
@@ -14,6 +17,7 @@ internal sealed class FullProcessCommand
 {
     const int STATUS_SUCCESS = 0;
     const int STATUS_USER_CANCELLED = 1;
+    const int STATUS_DESTINATION_EXISTS = 2;
 
     static readonly MediaFinder _mediaFinder = new();
     static readonly ExifExporter _exifExporter = new();
@@ -42,11 +46,21 @@ internal sealed class FullProcessCommand
         [CommandOption("-r|--roles", false)]
         [Description("Space delimited list of roles that should have access to the category")]
         [DefaultValue("admin friend")]
-        public string Roles { get; init; } = "admin friend";
+        public string Roles { get; init; } = "";
 
         [CommandOption("-i|--interactive", false)]
         [Description("Interactive mode - illustrate steps and prompt to continue before executing anything.")]
         public bool Interactive { get; init; }
+
+        [CommandOption("--local-asset-root", false)]
+        [Description("Local Asset Root - root directory where assets should be stored on local / processing machine.")]
+        [DefaultValue("/data/maw-media-assets")]
+        public string LocalAssetRoot { get; init; } = "";
+
+        [CommandOption("--remote-asset-root", false)]
+        [Description("Remote Asset Root - root directory where assets should be stored on remote / production server.")]
+        [DefaultValue("/home/svc_maw_media/maw-media/media-assets")]
+        public string RemoteAssetRoot { get; init; } = "";
     }
 
     public async override Task<int> ExecuteAsync(
@@ -58,8 +72,17 @@ internal sealed class FullProcessCommand
             settings.CategoryName,
             settings.MediaPath,
             settings.EffectiveDate,
-            settings.Roles
+            settings.Roles,
+            settings.LocalAssetRoot,
+            settings.RemoteAssetRoot
         );
+
+        if (Directory.Exists(category.LocalAssetPath))
+        {
+            AnsiConsole.MarkupLineInterpolated($"[bold red]!!** Asset directory {category.LocalAssetPath} already exists.  Please choose a unique directory name **!![/]");
+
+            return STATUS_DESTINATION_EXISTS;
+        }
 
         if (settings.Interactive && !PrintParametersAndContinue(category))
         {
@@ -79,12 +102,28 @@ internal sealed class FullProcessCommand
 
         AnsiConsole.MarkupLine("[yellow]** All files have been processed.  Please review to make sure they came out as expected.[/]");
 
-        if (!ContinuePrompt())
+        if (!ContinuePrompt("Development Deploy (please make sure dev pod is running)?"))
         {
             return STATUS_USER_CANCELLED;
         }
 
+        await LocalDeploy(category);
 
+        if (!ContinuePrompt("Production Deploy?"))
+        {
+            return STATUS_USER_CANCELLED;
+        }
+
+        await ProductionDeploy(category);
+
+        if (!ContinuePrompt("Remote Asset Archive?"))
+        {
+            return STATUS_USER_CANCELLED;
+        }
+
+        await RemoteArchive(category);
+
+        AnsiConsole.MarkupLine("[yellow]** COMPLETED **[/]");
 
         return STATUS_SUCCESS;
     }
@@ -151,13 +190,125 @@ internal sealed class FullProcessCommand
         await _scriptWriter.WriteRunnerScript(category);
     }
 
+    static async Task LocalDeploy(Category category)
+    {
+        var srcDir = Path.Combine(category.SourceDirectory, ScaleSpec.Src.Code);
+
+        if (!Path.Exists(srcDir))
+        {
+            Directory.CreateDirectory(srcDir);
+        }
+
+        MoveOriginalsToSrcDirectory(category, srcDir);
+        ZipPp3s(category, srcDir);
+
+        var dstDir = new DirectoryInfo(category.LocalAssetPath);
+        var parentDir = dstDir.Parent!;
+
+        if (!parentDir.Exists)
+        {
+            parentDir.Create();
+        }
+
+        // the following fails when trying to move across drives, so rather than manually copying
+        // all files, lets just use good ole mv
+        // Directory.Move(category.SourceDirectory, dstDir.FullName);
+        await Cli
+            .Wrap("mv")
+            .WithArguments([
+                category.SourceDirectory,
+                dstDir.FullName
+            ])
+            .ExecuteAsync();
+
+        await RunLocalImport(category, dstDir);
+    }
+
+    static async Task RunLocalImport(Category category, DirectoryInfo dstDir)
+    {
+        var script = Path.Combine(dstDir.FullName, Path.GetFileName(category.ScriptFile));
+
+        using var cmd = Cli
+            .Wrap("bash")
+            .WithArguments($"{script} dev")
+            .WithWorkingDirectory(dstDir.FullName)
+            .ExecuteBufferedAsync();
+
+        var cmdResult = await cmd;
+
+        if (!cmdResult.IsSuccess)
+        {
+            AnsiConsole.MarkupLine("[bold red]** Error running db import script: **[/]");
+            AnsiConsole.MarkupLineInterpolated($"[bold red] StdErr: [/][red]{cmdResult.StandardError}[/]");
+            AnsiConsole.MarkupLineInterpolated($"[bold yellow] StdOut: [/][yellow]{cmdResult.StandardOutput}[/]");
+
+            throw new ApplicationException("Error running import script!");
+        }
+    }
+
+    static void MoveOriginalsToSrcDirectory(Category category, string srcDir)
+    {
+        foreach (var media in category.Media)
+        {
+            File.Move(media.OriginalFilepath, Path.Combine(srcDir, Path.GetFileName(media.OriginalFilepath)));
+
+            if (media.SupportFilepath != null)
+            {
+                File.Move(media.SupportFilepath, Path.Combine(srcDir, Path.GetFileName(media.SupportFilepath)));
+            }
+        }
+    }
+
+    static void ZipPp3s(Category category, string srcDir)
+    {
+        var filesToZip = Directory.EnumerateFiles(srcDir, "*.pp3");
+
+        // archive pp3s
+        if (filesToZip.Any())
+        {
+            var zipFile = Path.Combine(srcDir, "pp3.zip");
+
+            using var zipStream = new FileStream(zipFile, FileMode.Create);
+            using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create);
+
+            foreach (var file in filesToZip)
+            {
+                var entry = Path.GetFileName(file);
+
+                zipArchive.CreateEntryFromFile(file, entry, CompressionLevel.Optimal);
+            }
+        }
+
+        // if the zipfile is created successfuly, delete the individual pp3s
+        if (filesToZip.Any())
+        {
+            foreach (var file in filesToZip)
+            {
+                File.Delete(file);
+            }
+        }
+    }
+
+    static Task ProductionDeploy(Category category)
+    {
+        throw new NotImplementedException();
+    }
+
+    static Task RemoteArchive(Category category)
+    {
+        throw new NotImplementedException();
+    }
+
     static bool PrintParametersAndContinue(Category category)
     {
         OutputHeader("Parameters");
-        OutputVariable(" Category Name", category.Name);
-        OutputVariable("Effective Date", category.EffectiveDate.ToString("yyyy-MM-dd"));
-        OutputVariable("  Media Source", category.SourceDirectory);
-        OutputVariable(" Base Web Path", category.BaseWebPath);
+        OutputVariable("    Category Name", category.Name);
+        OutputVariable("   Effective Date", category.EffectiveDate.ToString("yyyy-MM-dd"));
+        OutputVariable("     Media Source", category.SourceDirectory);
+        OutputVariable("     Base Web URL", category.BaseWebUrl);
+        OutputVariable("            Roles", string.Join(" ", category.Roles));
+        OutputVariable(" Local Asset Path", category.LocalAssetPath);
+        OutputVariable("Remote Asset Path", category.RemoteAssetPath);
 
         AnsiConsole.WriteLine();
 
@@ -224,9 +375,9 @@ internal sealed class FullProcessCommand
         _ => "?"
     };
 
-    static bool ContinuePrompt()
+    static bool ContinuePrompt(string? title = null)
     {
-        return AnsiConsole.Prompt(new ConfirmationPrompt("Continue?"));
+        return AnsiConsole.Prompt(new ConfirmationPrompt(title ?? "Continue?"));
     }
 
     static void OutputVariable(string name, string value)

@@ -10,8 +10,12 @@ public class Category
     public DateTime EffectiveDate { get; private set; }
     public string[] Roles { get; private set; }
     public IEnumerable<MediaFile> Media { get; set; } = [];
-    public string BaseWebPath => $"/assets/{EffectiveDate.Year}/{BaseDirectoryName}";
+    public string LocalAssetRoot { get; private set; }
+    public string RemoteAssetRoot { get; private set; }
     public string BaseDirectoryName => new DirectoryInfo(SourceDirectory).Name;
+    public string BaseWebUrl => $"/assets/{EffectiveDate.Year}/{BaseDirectoryName}";
+    public string LocalAssetPath => Path.Combine(LocalAssetRoot, EffectiveDate.Year.ToString(), BaseDirectoryName);
+    public string RemoteAssetPath => Path.Combine(RemoteAssetRoot, EffectiveDate.Year.ToString(), BaseDirectoryName);
     public string SqlFile => Path.Combine(SourceDirectory, "category.sql");
     public string ScriptFile => Path.Combine(SourceDirectory, "import.sh");
 
@@ -19,15 +23,19 @@ public class Category
         string name,
         string sourceDirectory,
         DateTime effectiveDate,
-        string roles
+        string roles,
+        string localAssetRoot,
+        string remoteAssetRoot
     )
     {
         Name = name;
         SourceDirectory = sourceDirectory;
         EffectiveDate = effectiveDate;
         Roles = roles.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        LocalAssetRoot = localAssetRoot;
+        RemoteAssetRoot = remoteAssetRoot;
     }
 
     public string BuildMediaFilePath(ScaleSpec spec, string filename) =>
-        Path.Combine(BaseWebPath, spec.Code, Path.GetFileName(filename));
+        Path.Combine(BaseWebUrl, spec.Code, Path.GetFileName(filename));
 }

@@ -25,6 +25,7 @@ class SqlWriter
         await WriteCategoryRoles(sw, category);
         await WriteLocations(sw, category);
         await WriteMedia(sw, category);
+        await WriteCategoryMedia(sw, category);
         await WriteRefreshMaterializedViews(sw);
         await WritePostscript(sw);
     }
@@ -147,7 +148,6 @@ class SqlWriter
                 """);
 
             await WriteMediaFiles(writer, media);
-            await WriteCategoryMedia(writer, category);
         }
     }
 

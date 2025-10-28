@@ -23,8 +23,10 @@ class ScriptWriter
                 #!/bin/bash
 
                 if [ "$1" = "dev" ]; then
+                    POD=dev-media-pod
                     ENVPGDATA=~/maw-media/dev/pg-secrets
                 else
+                    POD=pod-maw-media
                     ENVPGDATA=~/maw-media/pg-secrets
                 fi
 
@@ -58,8 +60,8 @@ class ScriptWriter
 
         await writer.WriteLineAsync(
             $$"""
-            podman run -it --rm \
-                --pod pod-maw-media \
+            podman run --rm \
+                --pod "${POD}" \
                 --name pg_import \
                 --security-opt label=disable \
                 --env "POSTGRES_PASSWORD_FILE=/secrets/psql-postgres" \

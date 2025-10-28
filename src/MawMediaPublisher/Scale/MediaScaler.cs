@@ -71,6 +71,7 @@ class MediaScaler
             if (scale.Width == int.MaxValue)
             {
                 yield return scale;
+                continue;
             }
 
             // if either dimension is greater than the scale bounds, scale it
