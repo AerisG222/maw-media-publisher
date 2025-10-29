@@ -1,7 +1,4 @@
 using System.ComponentModel;
-using System.IO.Compression;
-using CliWrap;
-using CliWrap.Buffered;
 using Spectre.Console;
 using Spectre.Console.Cli;
 using MawMediaPublisher.Metadata;
@@ -9,6 +6,7 @@ using MawMediaPublisher.Finder;
 using MawMediaPublisher.Models;
 using MawMediaPublisher.Scale;
 using MawMediaPublisher.Sql;
+using MawMediaPublisher.Deploy;
 
 namespace MawMediaPublisher.Commands;
 
@@ -25,6 +23,9 @@ internal sealed class FullProcessCommand
     static readonly MediaScaler _mediaScaler = new();
     static readonly SqlWriter _sqlWriter = new();
     static readonly ScriptWriter _scriptWriter = new();
+    static readonly LocalDeployer _localDeployer = new();
+    static readonly ProductionDeployer _productionDeployer = new();
+
     static readonly Lock _lock = new();
 
     public sealed class Settings
@@ -61,6 +62,21 @@ internal sealed class FullProcessCommand
         [Description("Remote Asset Root - root directory where assets should be stored on remote / production server.")]
         [DefaultValue("/home/svc_maw_media/maw-media/media-assets")]
         public string RemoteAssetRoot { get; init; } = "";
+
+        [CommandOption("-s|--server", false)]
+        [Description("Remote Server - hosts production instance of media.mikeandwan.us (ssh key should be configured first!)")]
+        [DefaultValue("chocobo")]
+        public string RemoteServer { get; init; } = "";
+
+        [CommandOption("-u|--user", false)]
+        [Description("Remote Username - service account on the remote server hosting media.mikeandwan.us)")]
+        [DefaultValue("svc_maw_media")]
+        public string RemoteUsername { get; init; } = "";
+
+        [CommandOption("--ssh-private-key-file", false)]
+        [Description("SSH Private Key File - Path to the private key to use when connecting via SSH to the remote server")]
+        [DefaultValue("/home/mmorano/.ssh/id_rsa")]
+        public string SshPrivateKeyFile { get; init; } = "";
     }
 
     public async override Task<int> ExecuteAsync(
@@ -74,12 +90,15 @@ internal sealed class FullProcessCommand
             settings.EffectiveDate,
             settings.Roles,
             settings.LocalAssetRoot,
-            settings.RemoteAssetRoot
+            settings.RemoteAssetRoot,
+            settings.RemoteServer,
+            settings.RemoteUsername,
+            settings.SshPrivateKeyFile
         );
 
-        if (Directory.Exists(category.LocalAssetPath))
+        if (Directory.Exists(category.LocalMediaPath))
         {
-            AnsiConsole.MarkupLineInterpolated($"[bold red]!!** Asset directory {category.LocalAssetPath} already exists.  Please choose a unique directory name **!![/]");
+            AnsiConsole.MarkupLineInterpolated($"[bold red]!!** Asset directory {category.LocalMediaPath} already exists.  Please choose a unique directory name **!![/]");
 
             return STATUS_DESTINATION_EXISTS;
         }
@@ -107,21 +126,21 @@ internal sealed class FullProcessCommand
             return STATUS_USER_CANCELLED;
         }
 
-        await LocalDeploy(category);
+        await _localDeployer.Deploy(category);
 
         if (!ContinuePrompt("Production Deploy?"))
         {
             return STATUS_USER_CANCELLED;
         }
 
-        await ProductionDeploy(category);
+        await _productionDeployer.Deploy(category);
 
         if (!ContinuePrompt("Remote Asset Archive?"))
         {
             return STATUS_USER_CANCELLED;
         }
 
-        await RemoteArchive(category);
+        //await RemoteArchive(category);
 
         AnsiConsole.MarkupLine("[yellow]** COMPLETED **[/]");
 
@@ -190,115 +209,6 @@ internal sealed class FullProcessCommand
         await _scriptWriter.WriteRunnerScript(category);
     }
 
-    static async Task LocalDeploy(Category category)
-    {
-        var srcDir = Path.Combine(category.SourceDirectory, ScaleSpec.Src.Code);
-
-        if (!Path.Exists(srcDir))
-        {
-            Directory.CreateDirectory(srcDir);
-        }
-
-        MoveOriginalsToSrcDirectory(category, srcDir);
-        ZipPp3s(category, srcDir);
-
-        var dstDir = new DirectoryInfo(category.LocalAssetPath);
-        var parentDir = dstDir.Parent!;
-
-        if (!parentDir.Exists)
-        {
-            parentDir.Create();
-        }
-
-        // the following fails when trying to move across drives, so rather than manually copying
-        // all files, lets just use good ole mv
-        // Directory.Move(category.SourceDirectory, dstDir.FullName);
-        await Cli
-            .Wrap("mv")
-            .WithArguments([
-                category.SourceDirectory,
-                dstDir.FullName
-            ])
-            .ExecuteAsync();
-
-        await RunLocalImport(category, dstDir);
-    }
-
-    static async Task RunLocalImport(Category category, DirectoryInfo dstDir)
-    {
-        var script = Path.Combine(dstDir.FullName, Path.GetFileName(category.ScriptFile));
-
-        using var cmd = Cli
-            .Wrap("bash")
-            .WithArguments($"{script} dev")
-            .WithWorkingDirectory(dstDir.FullName)
-            .ExecuteBufferedAsync();
-
-        var cmdResult = await cmd;
-
-        if (!cmdResult.IsSuccess)
-        {
-            AnsiConsole.MarkupLine("[bold red]** Error running db import script: **[/]");
-            AnsiConsole.MarkupLineInterpolated($"[bold red] StdErr: [/][red]{cmdResult.StandardError}[/]");
-            AnsiConsole.MarkupLineInterpolated($"[bold yellow] StdOut: [/][yellow]{cmdResult.StandardOutput}[/]");
-
-            throw new ApplicationException("Error running import script!");
-        }
-    }
-
-    static void MoveOriginalsToSrcDirectory(Category category, string srcDir)
-    {
-        foreach (var media in category.Media)
-        {
-            File.Move(media.OriginalFilepath, Path.Combine(srcDir, Path.GetFileName(media.OriginalFilepath)));
-
-            if (media.SupportFilepath != null)
-            {
-                File.Move(media.SupportFilepath, Path.Combine(srcDir, Path.GetFileName(media.SupportFilepath)));
-            }
-        }
-    }
-
-    static void ZipPp3s(Category category, string srcDir)
-    {
-        var filesToZip = Directory.EnumerateFiles(srcDir, "*.pp3");
-
-        // archive pp3s
-        if (filesToZip.Any())
-        {
-            var zipFile = Path.Combine(srcDir, "pp3.zip");
-
-            using var zipStream = new FileStream(zipFile, FileMode.Create);
-            using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create);
-
-            foreach (var file in filesToZip)
-            {
-                var entry = Path.GetFileName(file);
-
-                zipArchive.CreateEntryFromFile(file, entry, CompressionLevel.Optimal);
-            }
-        }
-
-        // if the zipfile is created successfuly, delete the individual pp3s
-        if (filesToZip.Any())
-        {
-            foreach (var file in filesToZip)
-            {
-                File.Delete(file);
-            }
-        }
-    }
-
-    static Task ProductionDeploy(Category category)
-    {
-        throw new NotImplementedException();
-    }
-
-    static Task RemoteArchive(Category category)
-    {
-        throw new NotImplementedException();
-    }
-
     static bool PrintParametersAndContinue(Category category)
     {
         OutputHeader("Parameters");
@@ -307,8 +217,13 @@ internal sealed class FullProcessCommand
         OutputVariable("     Media Source", category.SourceDirectory);
         OutputVariable("     Base Web URL", category.BaseWebUrl);
         OutputVariable("            Roles", string.Join(" ", category.Roles));
-        OutputVariable(" Local Asset Path", category.LocalAssetPath);
-        OutputVariable("Remote Asset Path", category.RemoteAssetPath);
+        OutputVariable("  Local Year Path", category.LocalYearPath);
+        OutputVariable(" Local Media Path", category.LocalMediaPath);
+        OutputVariable(" Remote Year Path", category.RemoteYearPath);
+        OutputVariable("Remote Media Path", category.RemoteMediaPath);
+        OutputVariable("    Remote Server", category.RemoteServer);
+        OutputVariable("  Remote Username", category.RemoteUsername);
+        OutputVariable("  Private SSH Key", category.SshPrivateKeyFile);
 
         AnsiConsole.WriteLine();
 

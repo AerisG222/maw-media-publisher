@@ -12,10 +12,15 @@ public class Category
     public IEnumerable<MediaFile> Media { get; set; } = [];
     public string LocalAssetRoot { get; private set; }
     public string RemoteAssetRoot { get; private set; }
+    public string RemoteServer { get; private set; }
+    public string RemoteUsername { get; private set; }
+    public string SshPrivateKeyFile { get; private set; }
     public string BaseDirectoryName => new DirectoryInfo(SourceDirectory).Name;
     public string BaseWebUrl => $"/assets/{EffectiveDate.Year}/{BaseDirectoryName}";
-    public string LocalAssetPath => Path.Combine(LocalAssetRoot, EffectiveDate.Year.ToString(), BaseDirectoryName);
-    public string RemoteAssetPath => Path.Combine(RemoteAssetRoot, EffectiveDate.Year.ToString(), BaseDirectoryName);
+    public string LocalYearPath => Path.Combine(LocalAssetRoot, EffectiveDate.Year.ToString());
+    public string LocalMediaPath => Path.Combine(LocalYearPath, BaseDirectoryName);
+    public string RemoteYearPath => Path.Combine(RemoteAssetRoot, EffectiveDate.Year.ToString());
+    public string RemoteMediaPath => Path.Combine(RemoteYearPath, BaseDirectoryName);
     public string SqlFile => Path.Combine(SourceDirectory, "category.sql");
     public string ScriptFile => Path.Combine(SourceDirectory, "import.sh");
 
@@ -25,7 +30,10 @@ public class Category
         DateTime effectiveDate,
         string roles,
         string localAssetRoot,
-        string remoteAssetRoot
+        string remoteAssetRoot,
+        string remoteServer,
+        string remoteUsername,
+        string sshPrivateKeyFile
     )
     {
         Name = name;
@@ -34,6 +42,9 @@ public class Category
         Roles = roles.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         LocalAssetRoot = localAssetRoot;
         RemoteAssetRoot = remoteAssetRoot;
+        RemoteServer = remoteServer;
+        RemoteUsername = remoteUsername;
+        SshPrivateKeyFile = sshPrivateKeyFile;
     }
 
     public string BuildMediaFilePath(ScaleSpec spec, string filename) =>
