@@ -20,7 +20,10 @@ public class ScaleTests
             DateTime.Now,
             "admin friend",
             "/data/local",
-            "/data/remote"
+            "/data/remote",
+            "non-existent-server",
+            "remote-username",
+            "ssh-private-key-file"
         );
 
         var results = mf.FindMedia(fi.DirectoryName!);
