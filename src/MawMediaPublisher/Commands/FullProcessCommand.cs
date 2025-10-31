@@ -83,7 +83,8 @@ internal sealed class FullProcessCommand
 
     public async override Task<int> ExecuteAsync(
         CommandContext context,
-        Settings settings
+        Settings settings,
+        CancellationToken token = default
     )
     {
         var category = new Category(
