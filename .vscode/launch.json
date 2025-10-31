@@ -5,10 +5,27 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "C#: MawMediaPublisher Debug",
-            "type": "dotnet",
+            "name": ".NET Core Launch (console)",
+            "type": "coreclr",
             "request": "launch",
-            "projectPath": "${workspaceFolder}/src/MawMediaPublisher/MawMediaPublisher.csproj"
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/MawMediaPublisher/bin/Debug/net9.0/MawMediaPublisher.dll",
+            "args": [
+                "-m",
+                "/home/mmorano/maw-media-publisher",
+                "-c",
+                "test category's name",
+                "-i"
+            ],
+            "cwd": "${workspaceFolder}/src/MawMediaPublisher",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
+            "name": ".NET Core Attach",
+            "type": "coreclr",
+            "request": "attach",
+            "processId": "${command:pickProcess}"
         }
     ]
 }
