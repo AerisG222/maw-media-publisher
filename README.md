@@ -34,5 +34,6 @@ dotnet ~/git/maw-media-publisher/src/MawMediaPublisher/bin/Release/net9.0/MawMed
 
 To simplify executing this, create the following alias:
 
-`bash
+```bash
 alias mmp='dotnet ~/git/maw-media-publisher/src/MawMediaPublisher/bin/Release/net9.0/MawMediaPublisher.dll'
+```
