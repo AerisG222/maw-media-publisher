@@ -1,12 +1,13 @@
 using System.ComponentModel;
 using Spectre.Console;
 using Spectre.Console.Cli;
-using MawMediaPublisher.Metadata;
+using MawMediaPublisher.Archive;
+using MawMediaPublisher.Deploy;
 using MawMediaPublisher.Finder;
+using MawMediaPublisher.Metadata;
 using MawMediaPublisher.Models;
 using MawMediaPublisher.Scale;
 using MawMediaPublisher.Sql;
-using MawMediaPublisher.Deploy;
 
 namespace MawMediaPublisher.Commands;
 
@@ -25,6 +26,7 @@ internal sealed class FullProcessCommand
     static readonly ScriptWriter _scriptWriter = new();
     static readonly LocalDeployer _localDeployer = new();
     static readonly ProductionDeployer _productionDeployer = new();
+    static readonly AwsS3Archiver _archiver = new AwsS3Archiver();
 
     static readonly Lock _lock = new();
 
@@ -140,7 +142,7 @@ internal sealed class FullProcessCommand
             return STATUS_USER_CANCELLED;
         }
 
-        //await RemoteArchive(category);
+        await ArchiveMedia(category);
 
         AnsiConsole.MarkupLine("[yellow]** COMPLETED **[/]");
 
@@ -201,6 +203,49 @@ internal sealed class FullProcessCommand
         }
 
         file.ScaledFiles = await _mediaScaler.ScaleMedia(category, file);
+    }
+
+    static async Task ArchiveMedia(Category category)
+    {
+        var pp3Archive = new FileInfo(Path.Combine(category.LocalMediaPath, ScaleSpec.Src.Code, LocalDeployer.PP3_ZIP));
+
+        _archiver.Authenticate();
+
+        await AnsiConsole.Progress()
+            .Columns([
+                new TaskDescriptionColumn(),
+                new ProgressBarColumn(),
+                new PercentageColumn(),
+                new SpinnerColumn(),
+            ])
+            .StartAsync(async ctx =>
+            {
+                var pp3ArchiveCount = pp3Archive.Exists ? 1 : 0;
+                var pctPerFile = (1.0 / (category.Media.Count() + pp3ArchiveCount)) * 100;
+                var task = ctx.AddTask("[green]Archiving Media[/]");
+
+                var opts = new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = 6
+                };
+
+                await Parallel.ForEachAsync(category.Media, opts, async (media, token) =>
+                {
+                    await _archiver.ArchiveMedia(category, media);
+
+                    lock (_lock)
+                    {
+                        task.Increment(pctPerFile);
+                    }
+                });
+
+                if (pp3Archive.Exists)
+                {
+                    await _archiver.ArchivePp3(category, pp3Archive);
+
+                    task.Increment(pctPerFile);
+                }
+            });
     }
 
     static async Task GenerateSql(Category category)

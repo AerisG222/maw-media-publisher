@@ -9,6 +9,8 @@ namespace MawMediaPublisher.Deploy;
 
 public class LocalDeployer
 {
+    public const string PP3_ZIP = "pp3.zip";
+
     public async Task Deploy(Category category)
     {
         var srcDir = Path.Combine(category.SourceDirectory, ScaleSpec.Src.Code);
@@ -79,7 +81,7 @@ public class LocalDeployer
         // archive pp3s
         if (filesToZip.Any())
         {
-            var zipFile = Path.Combine(srcDir, "pp3.zip");
+            var zipFile = Path.Combine(srcDir, PP3_ZIP);
 
             using var zipStream = new FileStream(zipFile, FileMode.Create);
             using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create);

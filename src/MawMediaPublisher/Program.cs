@@ -1,5 +1,5 @@
-﻿using MawMediaPublisher.Commands;
-using Spectre.Console.Cli;
+﻿using Spectre.Console.Cli;
+using MawMediaPublisher.Commands;
 
 var app = new CommandApp<FullProcessCommand>();
 
