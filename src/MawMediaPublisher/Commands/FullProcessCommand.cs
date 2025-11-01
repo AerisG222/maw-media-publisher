@@ -211,6 +211,9 @@ internal sealed class FullProcessCommand
     {
         var pp3Archive = new FileInfo(Path.Combine(category.LocalMediaPath, ScaleSpec.Src.Code, LocalDeployer.PP3_ZIP));
 
+        // note: authenticate does not block, so the progress and spinner will appear from 3 lines down and look
+        //       like it is starting before a user has successfully logged in.  however, nothing starts to upload
+        //       until properly logged in, so no files will be skipped / errored
         _archiver.Authenticate();
 
         await AnsiConsole.Progress()
