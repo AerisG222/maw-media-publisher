@@ -58,7 +58,7 @@ class MediaScaler
 
     static IEnumerable<ScaleSpec> GetScalesForDimensions(int width, int height, bool includePosters)
     {
-        var hasHitMax = false;
+        string? maxScaleCode = null;
 
         foreach (var scale in ScaleSpec.AllScales)
         {
@@ -79,9 +79,9 @@ class MediaScaler
             {
                 yield return scale;
             }
-            else if (!hasHitMax)
+            else if (maxScaleCode == null || string.Equals(scale.Code, maxScaleCode))
             {
-                hasHitMax = true;
+                maxScaleCode = scale.Code;
 
                 // if we are here, the item fits in the scale bounds, return this last scale so that we can keep the
                 // highest res that fits
