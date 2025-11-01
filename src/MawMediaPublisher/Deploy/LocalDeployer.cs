@@ -51,7 +51,7 @@ public class LocalDeployer
 
         var cmdResult = await cmd;
 
-        if (!cmdResult.IsSuccess)
+        if (!cmdResult.IsSuccess || !string.IsNullOrWhiteSpace(cmdResult.StandardError))
         {
             AnsiConsole.MarkupLine("[bold red]** Error running db import script: **[/]");
             AnsiConsole.MarkupLineInterpolated($"[bold red] StdErr: [/][red]{cmdResult.StandardError}[/]");
