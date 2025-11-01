@@ -88,9 +88,9 @@ class SqlWriter
                     SELECT 1
                     FROM media.location
                     WHERE
-                        latitude = {media.Exif!.Latitude}
+                        latitude = {SqlGpsCoord(media.Exif!.Latitude)}
                         AND
-                        longitude = {media.Exif.Longitude}
+                        longitude = {SqlGpsCoord(media.Exif.Longitude)}
                 )
                 THEN
                     INSERT INTO media.location (
@@ -99,8 +99,8 @@ class SqlWriter
                         longitude
                     ) VALUES (
                         {SqlAsString(Guid.CreateVersion7())},
-                        {SqlNonString(media.Exif.Latitude)},
-                        {SqlNonString(media.Exif.Longitude)}
+                        {SqlGpsCoord(media.Exif.Latitude)},
+                        {SqlGpsCoord(media.Exif.Longitude)}
                     );
                 END IF;
 
@@ -112,6 +112,20 @@ class SqlWriter
     {
         foreach (var media in category.Media)
         {
+            var locationId =
+                media.Exif?.Latitude == null || media.Exif?.Longitude == null
+                    ? "NULL"
+                    :   $"""
+                            (
+                                SELECT id
+                                FROM media.location
+                                WHERE
+                                    latitude = {SqlGpsCoord(media.Exif!.Latitude)}
+                                    AND
+                                    longitude = {SqlGpsCoord(media.Exif.Longitude)}
+                            )
+                        """;
+
             await writer.WriteLineAsync(
                 $"""
                 INSERT INTO media.media (
@@ -128,14 +142,7 @@ class SqlWriter
                 ) VALUES (
                     {SqlAsString(media.Id)},
                     {SqlMediaType(media.MediaType)},
-                    (
-                        SELECT id
-                        FROM media.location
-                        WHERE
-                            latitude = {media.Exif!.Latitude}
-                            AND
-                            longitude = {media.Exif.Longitude}
-                    ),
+                    {locationId},
                     {SqlString(null)},
                     {SqlDate(media.Exif!.CreateDate)},
                     {SqlAsString(ADMIN_ID)},
@@ -286,6 +293,12 @@ class SqlWriter
     {
         null => "NULL",
         _ => $"{val}"
+    };
+
+    static string SqlGpsCoord(decimal? val) => val switch
+    {
+        null => "NULL",
+        _ => $"{val:F6}"
     };
 
     static string SqlJson(JsonElement? json) => json switch
