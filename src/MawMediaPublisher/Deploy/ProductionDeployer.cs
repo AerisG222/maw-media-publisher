@@ -48,11 +48,11 @@ public class ProductionDeployer
 
     static void ApplySqlScripts(Category category, SshClient client)
     {
-        var script = Path.Combine(category.RemoteMediaPath, Path.GetFileName(category.ScriptFile));
-        var sql = Path.Combine(category.RemoteMediaPath, Path.GetFileName(category.SqlFile));
+        var script = Path.GetFileName(category.ScriptFile);
+        var sql = Path.GetFileName(category.SqlFile);
 
-        using var cmd1 = client.RunCommand($"{script} prod");
-        using var cmd2 = client.RunCommand($"rm {script}");
-        using var cmd3 = client.RunCommand($"rm {sql}");
+        using var cmd1 = client.RunCommand($"cd {category.RemoteMediaPath} && ./{script} prod");
+        using var cmd2 = client.RunCommand($"cd {category.RemoteMediaPath} && rm {script}");
+        using var cmd3 = client.RunCommand($"cd {category.RemoteMediaPath} && rm {sql}");
     }
 }
