@@ -161,8 +161,9 @@ internal sealed class FullProcessCommand
             ])
             .StartAsync(async ctx =>
             {
-                var pctPerFile = (1.0 / category.Media.Count()) * 100;
                 var task = ctx.AddTask("[green]Processing Media[/]");
+
+                task.MaxValue = category.Media.Count();
 
                 // from the migration app:
                 // when processing highest res image to full hi res destination, we kept crashing
@@ -179,7 +180,7 @@ internal sealed class FullProcessCommand
 
                     lock (_lock)
                     {
-                        task.Increment(pctPerFile);
+                        task.Increment(1);
                     }
                 });
 
@@ -221,9 +222,10 @@ internal sealed class FullProcessCommand
             ])
             .StartAsync(async ctx =>
             {
-                var pp3ArchiveCount = pp3Archive.Exists ? 1 : 0;
-                var pctPerFile = (1.0 / (category.Media.Count() + pp3ArchiveCount)) * 100;
                 var task = ctx.AddTask("[green]Archiving Media[/]");
+                var pp3ArchiveCount = pp3Archive.Exists ? 1 : 0;
+
+                task.MaxValue = category.Media.Count() + pp3ArchiveCount;
 
                 var opts = new ParallelOptions
                 {
@@ -236,7 +238,7 @@ internal sealed class FullProcessCommand
 
                     lock (_lock)
                     {
-                        task.Increment(pctPerFile);
+                        task.Increment(1);
                     }
                 });
 
@@ -244,7 +246,7 @@ internal sealed class FullProcessCommand
                 {
                     await _archiver.ArchivePp3(category, pp3Archive);
 
-                    task.Increment(pctPerFile);
+                    task.Increment(1);
                 }
             });
     }
