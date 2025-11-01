@@ -65,8 +65,8 @@ class ScriptWriter
                 --name pg_import \
                 --security-opt label=disable \
                 --env "POSTGRES_PASSWORD_FILE=/secrets/psql-postgres" \
-                --volume "./:{{containerDir}}" \
-                --volume "${ENVPGDATA}:/secrets" \
+                --volume "./:{{containerDir}}:ro" \
+                --volume "${ENVPGDATA}:/secrets:ro" \
                 docker.io/library/postgres:18-trixie \
                     psql \
                     --host localhost \
