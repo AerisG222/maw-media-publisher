@@ -77,7 +77,14 @@ public class ExifInfo
                 return _latitude;
             }
 
-            _latitude = GetDecimalFromNum(FindFirstPropertyByName(Json, TAG_GPS_LATITUDE));
+            var composite = CompositeElement;
+
+            if(composite != null)
+            {
+                _latitude = GetDecimalFromNum(
+                    FindFirstPropertyByName(composite.Value, TAG_GPS_LATITUDE)
+                );
+            }
 
             return _latitude;
         }
@@ -92,9 +99,24 @@ public class ExifInfo
                 return _longitude;
             }
 
-            _longitude = GetDecimalFromNum(FindFirstPropertyByName(Json, TAG_GPS_LONGITUDE));
+            var composite = CompositeElement;
+
+            if(composite != null)
+            {
+                _longitude = GetDecimalFromNum(
+                    FindFirstPropertyByName(composite.Value, TAG_GPS_LONGITUDE)
+                );
+            }
 
             return _longitude;
+        }
+    }
+
+    public JsonElement? CompositeElement
+    {
+        get
+        {
+            return FindFirstPropertyByName(Json, "Composite");
         }
     }
 
