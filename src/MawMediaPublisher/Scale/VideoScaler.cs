@@ -7,6 +7,7 @@ namespace MawMediaPublisher.Scale;
 class VideoScaler
 {
     ExifExporter _exifExporter = new();
+    DurationInspector _durationInspector = new DurationInspector();
 
     public async Task<ScaledFile> Scale(
         Category category,
@@ -49,11 +50,11 @@ class VideoScaler
         );
     }
 
-    static async Task ScaleVideo(FileInfo src, FileInfo dst, ScaleSpec scale)
+    async Task ScaleVideo(FileInfo src, FileInfo dst, ScaleSpec scale)
     {
         using var cmd = Cli
             .Wrap("ffmpeg")
-            .WithArguments(GetFfmpegArgs(src.FullName, dst.FullName, scale))
+            .WithArguments(await GetFfmpegArgs(src.FullName, dst.FullName, scale))
             .ExecuteAsync();
 
         await cmd;
@@ -62,7 +63,7 @@ class VideoScaler
     // https://trac.ffmpeg.org/wiki/Encode/AV1#SVT-AV1
     // https://www.ffmpeg.org/ffmpeg-all.html#scale-1
     // https://evilmartians.com/chronicles/better-web-video-with-av1-codec
-    static IEnumerable<string> GetFfmpegArgs(string src, string dst, ScaleSpec scale)
+    async Task<IEnumerable<string>> GetFfmpegArgs(string src, string dst, ScaleSpec scale)
     {
         List<string> args = [
             "-i", src,
@@ -102,8 +103,16 @@ class VideoScaler
 
         if (scale.IsPoster)
         {
+            var duration = await _durationInspector.Inspect(new FileInfo(src));
+
+            if(duration > 2)
+            {
+                args.AddRange([
+                    "-ss", "00:00:02",
+                ]);
+            }
+
             args.AddRange([
-                "-ss", "00:00:02",
                 "-frames:v", "1"
             ]);
         }
