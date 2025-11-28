@@ -22,11 +22,11 @@ class ScriptWriter
                 """
                 #!/bin/bash
 
+                POD=pod-maw-media
+
                 if [ "$1" = "dev" ]; then
-                    POD=dev-media-pod
                     ENVPGDATA=~/maw-media/dev/pg-secrets
                 else
-                    POD=pod-maw-media
                     ENVPGDATA=~/maw-media/pg-secrets
                 fi
 
