@@ -37,6 +37,7 @@ class SqlWriter
                 INSERT INTO media.category (
                     id,
                     name,
+                    slug,
                     effective_date,
                     created,
                     created_by,
@@ -45,6 +46,7 @@ class SqlWriter
                 ) VALUES (
                     {SqlAsString(category.Id)},
                     {SqlString(category.Name)},
+                    {SqlString(category.Slug)},
                     {SqlDate(category.EffectiveDate)},
                     {SqlDate(NOW)},
                     {SqlAsString(ADMIN_ID)},
@@ -199,6 +201,7 @@ class SqlWriter
                 INSERT INTO media.category_media (
                     category_id,
                     media_id,
+                    slug,
                     is_teaser,
                     created,
                     created_by,
@@ -207,6 +210,7 @@ class SqlWriter
                 ) VALUES (
                     {SqlAsString(category.Id)},
                     {SqlAsString(media.Id)},
+                    {SqlAsString(media.Slug)},
                     {SqlNonString(isTeaser)},
                     {SqlDate(NOW)},
                     {SqlAsString(ADMIN_ID)},

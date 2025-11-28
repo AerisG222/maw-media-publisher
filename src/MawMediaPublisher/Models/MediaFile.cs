@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using MawMediaPublisher.Metadata;
 using MawMediaPublisher.Scale;
 
@@ -13,6 +14,19 @@ public class MediaFile
     public ExifInfo? Exif { get; set; }
     public float? VideoDuration { get; set; }
     public IEnumerable<ScaledFile> ScaledFiles { get; set; } = [];
+    public string Slug
+    {
+        get
+        {
+            var origFile = Path.GetFileNameWithoutExtension(OriginalFilepath);
+
+            origFile = Regex.Replace(origFile, @"[^a-zA-Z0-9_\-]", string.Empty);
+
+            return origFile
+                .Replace("_", "-")
+                .ToLower();
+        }
+    }
 
     public MediaFile(string file, MediaType type)
     {

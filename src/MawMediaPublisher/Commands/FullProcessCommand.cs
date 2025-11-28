@@ -265,6 +265,7 @@ internal sealed class FullProcessCommand
         OutputHeader("Parameters");
         OutputVariable("    Category Name", category.Name);
         OutputVariable("   Effective Date", category.EffectiveDate.ToString("yyyy-MM-dd"));
+        OutputVariable("    Category Slug", category.Slug);
         OutputVariable("     Media Source", category.SourceDirectory);
         OutputVariable("     Base Web URL", category.BaseWebUrl);
         OutputVariable("            Roles", string.Join(" ", category.Roles));
@@ -290,10 +291,12 @@ internal sealed class FullProcessCommand
         grid.AddColumn();
         grid.AddColumn();
         grid.AddColumn();
+        grid.AddColumn();
 
         grid.AddRow([
             new Text("UNK", new Style(Color.Yellow, decoration: Decoration.Bold)),
             new Text("Type", new Style(Color.Yellow, decoration: Decoration.Bold)),
+            new Text("Slug", new Style(Color.Yellow, decoration: Decoration.Bold)),
             new Text("Original", new Style(Color.Yellow, decoration: Decoration.Bold)),
             new Text("Processing", new Style(Color.Yellow, decoration: Decoration.Bold)),
             new Text("Support", new Style(Color.Yellow, decoration: Decoration.Bold)),
@@ -304,6 +307,7 @@ internal sealed class FullProcessCommand
             grid.AddRow([
                 new Text("", new Style(Color.Green)),
                 new Text(MediaTypeDisplayForGrid(file.MediaType), new Style(Color.Green)),
+                new Text(file.Slug, new Style(Color.Green)),
                 new Text(Path.GetFileName(file.OriginalFilepath), new Style(Color.Green)),
                 new Text(Path.GetFileName(file.ProcessingFilepath) ?? "", new Style(Color.Green)),
                 new Text(Path.GetFileName(file.SupportFilepath) ?? "", new Style(Color.Green)),
@@ -314,6 +318,7 @@ internal sealed class FullProcessCommand
         {
             grid.AddRow([
                 new Text("!!", new Style(Color.Red)),
+                new Text(""),
                 new Text(""),
                 new Text(Path.GetFileName(file), new Style(Color.Red)),
                 new Text(""),
