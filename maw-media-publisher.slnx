@@ -1,0 +1,8 @@
+<Solution>
+    <Folder Name="/src/">
+        <Project Path="src/MawMediaPublisher/MawMediaPublisher.csproj" />
+    </Folder>
+    <Folder Name="/test/">
+        <Project Path="test/MawMediaPublisher.Tests/MawMediaPublisher.Tests.csproj" />
+    </Folder>
+</Solution>
