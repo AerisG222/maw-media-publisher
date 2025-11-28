@@ -9,7 +9,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/src/MawMediaPublisher/bin/Debug/net9.0/MawMediaPublisher.dll",
+            "program": "${workspaceFolder}/src/MawMediaPublisher/bin/Debug/net10.0/MawMediaPublisher.dll",
             "args": [
                 "-m",
                 "/home/mmorano/maw-media-publisher",

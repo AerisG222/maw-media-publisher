@@ -25,7 +25,7 @@ The following is an example to run this from the project directory during testin
 This is an example of how to run for production
 dotnet run -- -m ~/maw-media-publisher/ -c "test category's name" -i
 
-dotnet ~/git/maw-media-publisher/src/MawMediaPublisher/bin/Release/net9.0/MawMediaPublisher.dll \
+dotnet ~/git/maw-media-publisher/src/MawMediaPublisher/bin/Release/net10.0/MawMediaPublisher.dll \
     -m ~/my-photos \
     -c "cat name" \
     -i
@@ -35,5 +35,5 @@ dotnet ~/git/maw-media-publisher/src/MawMediaPublisher/bin/Release/net9.0/MawMed
 To simplify executing this, create the following alias:
 
 ```bash
-alias mmp='dotnet ~/git/maw-media-publisher/src/MawMediaPublisher/bin/Release/net9.0/MawMediaPublisher.dll'
+alias mmp='dotnet ~/git/maw-media-publisher/src/MawMediaPublisher/bin/Release/net10.0/MawMediaPublisher.dll'
 ```
