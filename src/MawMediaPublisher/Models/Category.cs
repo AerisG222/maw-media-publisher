@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using MawMediaPublisher.Scale;
 
 namespace MawMediaPublisher.Models;
@@ -24,17 +23,7 @@ public class Category
     public string RemoteMediaPath => Path.Combine(RemoteYearPath, BaseDirectoryName);
     public string SqlFile => Path.Combine(SourceDirectory, "category.sql");
     public string ScriptFile => Path.Combine(SourceDirectory, "import.sh");
-    public string Slug
-    {
-        get
-        {
-            var slug = Regex.Replace(Name, @"[^a-zA-Z0-9_\-]", string.Empty);
-
-            return slug
-                .Replace("_", "-")
-                .ToLower();
-        }
-    }
+    public string Slug => SlugHelper.MakeSafeSlug(Name);
 
     public Category(
         string name,
