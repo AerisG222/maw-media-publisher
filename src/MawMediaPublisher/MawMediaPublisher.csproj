@@ -9,10 +9,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="AWSSDK.S3" Version="4.0.13.1" />
-        <PackageReference Include="AWSSDK.SecurityToken" Version="4.0.5.1" />
-        <PackageReference Include="AWSSDK.SSO" Version="4.0.2.5" />
-        <PackageReference Include="AWSSDK.SSOOIDC" Version="4.0.3.6" />
+        <PackageReference Include="AWSSDK.S3" Version="4.0.16" />
+        <PackageReference Include="AWSSDK.SecurityToken" Version="4.0.5.4" />
+        <PackageReference Include="AWSSDK.SSO" Version="4.0.2.8" />
+        <PackageReference Include="AWSSDK.SSOOIDC" Version="4.0.3.9" />
         <PackageReference Include="CliWrap" Version="3.10.0" />
         <PackageReference Include="Spectre.Console" Version="0.54.0" />
         <PackageReference Include="Spectre.Console.Cli" Version="0.53.1" />
