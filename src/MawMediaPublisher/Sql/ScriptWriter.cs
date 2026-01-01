@@ -61,6 +61,7 @@ class ScriptWriter
         await writer.WriteLineAsync(
             $$"""
             podman run --rm \
+                --replace \
                 --pod "${POD}" \
                 --name pg_import \
                 --security-opt label=disable \
