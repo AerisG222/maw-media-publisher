@@ -11,7 +11,10 @@ public class SlugHelper
                 .Replace("_", "-")
                 .ToLower();
 
+        // remove consecutive dashes
+        var slugNoExtraDashes = Regex.Replace(slug, @"--+", "-");
+
         // remove any unallowed characters
-        return Regex.Replace(slug, @"[^a-zA-Z0-9_\-]", string.Empty);
+        return Regex.Replace(slugNoExtraDashes, @"[^a-zA-Z0-9_\-]", string.Empty);
     }
 }
