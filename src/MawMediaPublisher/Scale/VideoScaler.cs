@@ -18,7 +18,7 @@ class VideoScaler
     {
         var dstFilename = $"{Path.GetFileNameWithoutExtension(src.Name)}{(scale.IsPoster ? ".poster.avif" : ".mp4")}";
         var dst = new FileInfo(Path.Combine(dstDir, dstFilename));
-        ExifInfo? exif = null;
+        ExifInfo? exif;
 
         // see if it exists as we may be trying to reprocess
         if (!dst.Exists)
@@ -44,7 +44,7 @@ class VideoScaler
             Guid.CreateVersion7(),
             scale,
             category.BuildMediaFilePath(scale, dst.Name),
-            exif!.Width,
+            exif.Width,
             exif.Height,
             dst.Length
         );

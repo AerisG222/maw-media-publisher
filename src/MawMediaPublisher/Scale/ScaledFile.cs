@@ -1,6 +1,6 @@
 namespace MawMediaPublisher.Scale;
 
-public record class ScaledFile(
+public record ScaledFile(
     Guid Id,
     ScaleSpec Scale,
     string Path,

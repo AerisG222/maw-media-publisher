@@ -34,7 +34,7 @@ public class ProductionDeployer
 
     static async Task CopyAssetsToRemote(Category category)
     {
-        var cmd = await Cli
+        await Cli
             .Wrap("rsync")
             .WithArguments([
                 "-ah",

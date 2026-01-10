@@ -56,7 +56,7 @@ class ScriptWriter
     async Task WriteRunScript(StreamWriter writer, string filename)
     {
         var containerDir = "/scripts";
-        var file = Path.Combine(containerDir, Path.GetFileName(filename)!);
+        var file = Path.Combine(containerDir, Path.GetFileName(filename));
 
         await writer.WriteLineAsync(
             $$"""

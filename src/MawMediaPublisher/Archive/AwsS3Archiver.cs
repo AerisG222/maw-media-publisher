@@ -55,7 +55,7 @@ class AwsS3Archiver
             StorageClass = S3StorageClass.DeepArchive
         };
 
-        var response = await _client.PutObjectAsync(putRequest);
+        await _client.PutObjectAsync(putRequest);
     }
 
     static AWSCredentials LoadSsoCredentials(string profile)

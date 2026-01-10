@@ -28,7 +28,7 @@ public class LocalDeployer
         // the following fails when trying to move across drives, so rather than manually copying
         // all files, lets just use good ole mv
         // Directory.Move(category.SourceDirectory, dstDir.FullName);
-        var cmd = await Cli
+        await Cli
             .Wrap("mv")
             .WithArguments([
                 category.SourceDirectory,
@@ -76,10 +76,12 @@ public class LocalDeployer
 
     static void ZipPp3s(Category category, string srcDir)
     {
-        var filesToZip = Directory.EnumerateFiles(srcDir, "*.pp3");
+        var filesToZip = Directory
+            .EnumerateFiles(srcDir, "*.pp3")
+            .ToList();
 
         // archive pp3s
-        if (filesToZip.Any())
+        if (filesToZip.Count > 0)
         {
             var zipFile = Path.Combine(srcDir, PP3_ZIP);
 
@@ -94,8 +96,8 @@ public class LocalDeployer
             }
         }
 
-        // if the zipfile is created successfuly, delete the individual pp3s
-        if (filesToZip.Any())
+        // if the zipfile is created successfully, delete the individual pp3s
+        if (filesToZip.Count > 0)
         {
             foreach (var file in filesToZip)
             {

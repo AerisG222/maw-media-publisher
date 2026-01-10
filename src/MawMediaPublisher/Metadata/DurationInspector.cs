@@ -18,10 +18,7 @@ class DurationInspector
             ])
             .ExecuteBufferedAsync();
 
-        BufferedCommandResult? result = null;
-
-        result = await cmd;
-
+        var result = await cmd;
         var output = result.StandardOutput.Trim();
 
         if (string.IsNullOrWhiteSpace(output))
@@ -29,7 +26,7 @@ class DurationInspector
             throw new InvalidDataException($"Expected to get duration from ffprobe for {src.FullName}");
         }
 
-        if (float.TryParse(output, out float duration))
+        if (float.TryParse(output, out var duration))
         {
             return duration;
         }

@@ -14,7 +14,7 @@ public class DirectoryExistsAttribute
 
     public override ValidationResult Validate(CommandParameterContext ctx)
     {
-        if (typeof(string) != ctx?.Value?.GetType())
+        if (typeof(string) != ctx.Value?.GetType())
         {
             return ValidationResult.Error("A string must be used to specify the directory!");
         }

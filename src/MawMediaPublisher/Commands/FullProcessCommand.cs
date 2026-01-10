@@ -171,6 +171,8 @@ internal sealed class FullProcessCommand
 
                 await Parallel.ForEachAsync(category.Media, opts, async (media, token) =>
                 {
+                    token.ThrowIfCancellationRequested();
+
                     await ProcessMedia(category, media);
 
                     lock (_lock)
@@ -227,6 +229,8 @@ internal sealed class FullProcessCommand
 
                 await Parallel.ForEachAsync(category.Media, opts, async (media, token) =>
                 {
+                    token.ThrowIfCancellationRequested();
+
                     await _archiver.ArchiveMedia(category, media);
 
                     lock (_lock)

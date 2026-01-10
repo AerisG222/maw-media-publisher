@@ -17,7 +17,7 @@ class PhotoScaler
     {
         var dstFilename = $"{Path.GetFileNameWithoutExtension(src.Name)}.avif";
         var dst = new FileInfo(Path.Combine(dstDir, dstFilename));
-        ExifInfo? exif = null;
+        ExifInfo? exif;
 
         // see if it exists as we may be trying to reprocess
         if (!dst.Exists)
@@ -43,7 +43,7 @@ class PhotoScaler
             Guid.CreateVersion7(),
             scale,
             category.BuildMediaFilePath(scale, dst.Name),
-            exif!.Width,
+            exif.Width,
             exif.Height,
             dst.Length
         );

@@ -1,6 +1,6 @@
 namespace MawMediaPublisher.Scale;
 
-public record class ScaleSpec(
+public record ScaleSpec(
     string Code,
     int Width,
     int Height,

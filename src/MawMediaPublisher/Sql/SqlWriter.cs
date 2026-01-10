@@ -285,12 +285,9 @@ class SqlWriter
 
     static string SqlFileMediaType(MediaType? val, bool isPoster)
     {
-        if (isPoster)
-        {
-            return SqlAsString(MEDIA_TYPE_ID_VIDEO_POSTER);
-        }
-
-        return SqlMediaType(val);
+        return isPoster
+            ? SqlAsString(MEDIA_TYPE_ID_VIDEO_POSTER)
+            : SqlMediaType(val);
     }
 
     static string SqlNonString<T>(T val) => val switch
@@ -308,6 +305,6 @@ class SqlWriter
     static string SqlJson(JsonElement? json) => json switch
     {
         null => "NULL",
-        _ => $"'{json?.ToString()?.Replace("'", "''")}'::jsonb"
+        _ => $"'{json.Value.ToString().Replace("'", "''")}'::jsonb"
     };
 }
