@@ -1,4 +1,3 @@
-using System.Text.Json;
 using MawMediaPublisher.Metadata;
 
 namespace MawMediaPublisher.Tests;

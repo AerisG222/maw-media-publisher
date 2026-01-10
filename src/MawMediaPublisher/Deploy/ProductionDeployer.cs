@@ -1,7 +1,7 @@
 using CliWrap;
-using Spectre.Console;
-using Renci.SshNet;
 using MawMediaPublisher.Models;
+using Renci.SshNet;
+using Spectre.Console;
 
 namespace MawMediaPublisher.Deploy;
 

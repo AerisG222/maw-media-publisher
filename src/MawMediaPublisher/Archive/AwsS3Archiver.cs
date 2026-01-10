@@ -3,9 +3,9 @@ using Amazon.Runtime.CredentialManagement;
 using Amazon.S3;
 using Amazon.S3.Model;
 using CliWrap;
-using Spectre.Console;
 using MawMediaPublisher.Models;
 using MawMediaPublisher.Scale;
+using Spectre.Console;
 
 namespace MawMediaPublisher.Archive;
 
@@ -17,7 +17,7 @@ class AwsS3Archiver
     const string SSO_CREDS = "mawpower";
     const string S3_BUCKET = "mikeandwan-us-assets";
 
-    AmazonS3Client? _client = null;
+    AmazonS3Client? _client;
 
     public void Authenticate()
     {
@@ -71,7 +71,7 @@ class AwsS3Archiver
 
         if (ssoCredentials == null)
         {
-            throw new Exception($"Did not obtain valid SSO credentials for AWS");
+            throw new Exception("Did not obtain valid SSO credentials for AWS");
         }
 
         ssoCredentials.Options.ClientName = "MawMediaPublisher";

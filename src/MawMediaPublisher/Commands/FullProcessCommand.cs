@@ -1,6 +1,4 @@
 using System.ComponentModel;
-using Spectre.Console;
-using Spectre.Console.Cli;
 using MawMediaPublisher.Archive;
 using MawMediaPublisher.Deploy;
 using MawMediaPublisher.Finder;
@@ -8,6 +6,8 @@ using MawMediaPublisher.Metadata;
 using MawMediaPublisher.Models;
 using MawMediaPublisher.Scale;
 using MawMediaPublisher.Sql;
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace MawMediaPublisher.Commands;
 
@@ -42,40 +42,40 @@ internal sealed class FullProcessCommand
         [Description("Name of the category.")]
         public string CategoryName { get; init; } = "";
 
-        [CommandOption("-d|--effective-date", false)]
+        [CommandOption("-d|--effective-date")]
         [Description("Effective date, in (yyyy-mm-dd) format, to use for this category.  Defaults to now.")]
         public DateTime EffectiveDate { get; init; } = DateTime.Now;
 
-        [CommandOption("-r|--roles", false)]
+        [CommandOption("-r|--roles")]
         [Description("Space delimited list of roles that should have access to the category")]
         [DefaultValue("admin friend")]
         public string Roles { get; init; } = "";
 
-        [CommandOption("-i|--interactive", false)]
+        [CommandOption("-i|--interactive")]
         [Description("Interactive mode - illustrate steps and prompt to continue before executing anything.")]
         public bool Interactive { get; init; }
 
-        [CommandOption("--local-asset-root", false)]
+        [CommandOption("--local-asset-root")]
         [Description("Local Asset Root - root directory where assets should be stored on local / processing machine.")]
         [DefaultValue("/data/maw-media-assets")]
         public string LocalAssetRoot { get; init; } = "";
 
-        [CommandOption("--remote-asset-root", false)]
+        [CommandOption("--remote-asset-root")]
         [Description("Remote Asset Root - root directory where assets should be stored on remote / production server.")]
         [DefaultValue("/home/svc_maw_media/maw-media/media-assets")]
         public string RemoteAssetRoot { get; init; } = "";
 
-        [CommandOption("-s|--server", false)]
+        [CommandOption("-s|--server")]
         [Description("Remote Server - hosts production instance of media.mikeandwan.us (ssh key should be configured first!)")]
         [DefaultValue("chocobo")]
         public string RemoteServer { get; init; } = "";
 
-        [CommandOption("-u|--user", false)]
+        [CommandOption("-u|--user")]
         [Description("Remote Username - service account on the remote server hosting media.mikeandwan.us)")]
         [DefaultValue("svc_maw_media")]
         public string RemoteUsername { get; init; } = "";
 
-        [CommandOption("--ssh-private-key-file", false)]
+        [CommandOption("--ssh-private-key-file")]
         [Description("SSH Private Key File - Path to the private key to use when connecting via SSH to the remote server")]
         [DefaultValue("/home/mmorano/.ssh/id_rsa")]
         public string SshPrivateKeyFile { get; init; } = "";
@@ -153,12 +153,7 @@ internal sealed class FullProcessCommand
     static async Task ProcessCategoryMedia(Category category)
     {
         await AnsiConsole.Progress()
-            .Columns([
-                new TaskDescriptionColumn(),
-                new ProgressBarColumn(),
-                new PercentageColumn(),
-                new SpinnerColumn(),
-            ])
+            .Columns(new TaskDescriptionColumn(), new ProgressBarColumn(), new PercentageColumn(), new SpinnerColumn())
             .StartAsync(async ctx =>
             {
                 var task = ctx.AddTask("[green]Processing Media[/]");
@@ -217,12 +212,7 @@ internal sealed class FullProcessCommand
         _archiver.Authenticate();
 
         await AnsiConsole.Progress()
-            .Columns([
-                new TaskDescriptionColumn(),
-                new ProgressBarColumn(),
-                new PercentageColumn(),
-                new SpinnerColumn(),
-            ])
+            .Columns(new TaskDescriptionColumn(), new ProgressBarColumn(), new PercentageColumn(), new SpinnerColumn())
             .StartAsync(async ctx =>
             {
                 var task = ctx.AddTask("[green]Archiving Media[/]");
@@ -293,37 +283,16 @@ internal sealed class FullProcessCommand
         grid.AddColumn();
         grid.AddColumn();
 
-        grid.AddRow([
-            new Text("UNK", new Style(Color.Yellow, decoration: Decoration.Bold)),
-            new Text("Type", new Style(Color.Yellow, decoration: Decoration.Bold)),
-            new Text("Slug", new Style(Color.Yellow, decoration: Decoration.Bold)),
-            new Text("Original", new Style(Color.Yellow, decoration: Decoration.Bold)),
-            new Text("Processing", new Style(Color.Yellow, decoration: Decoration.Bold)),
-            new Text("Support", new Style(Color.Yellow, decoration: Decoration.Bold)),
-        ]);
+        grid.AddRow(new Text("UNK", new Style(Color.Yellow, decoration: Decoration.Bold)), new Text("Type", new Style(Color.Yellow, decoration: Decoration.Bold)), new Text("Slug", new Style(Color.Yellow, decoration: Decoration.Bold)), new Text("Original", new Style(Color.Yellow, decoration: Decoration.Bold)), new Text("Processing", new Style(Color.Yellow, decoration: Decoration.Bold)), new Text("Support", new Style(Color.Yellow, decoration: Decoration.Bold)));
 
         foreach (var file in files.Media)
         {
-            grid.AddRow([
-                new Text("", new Style(Color.Green)),
-                new Text(MediaTypeDisplayForGrid(file.MediaType), new Style(Color.Green)),
-                new Text(file.Slug, new Style(Color.Green)),
-                new Text(Path.GetFileName(file.OriginalFilepath), new Style(Color.Green)),
-                new Text(Path.GetFileName(file.ProcessingFilepath) ?? "", new Style(Color.Green)),
-                new Text(Path.GetFileName(file.SupportFilepath) ?? "", new Style(Color.Green)),
-            ]);
+            grid.AddRow(new Text("", new Style(Color.Green)), new Text(MediaTypeDisplayForGrid(file.MediaType), new Style(Color.Green)), new Text(file.Slug, new Style(Color.Green)), new Text(Path.GetFileName(file.OriginalFilepath), new Style(Color.Green)), new Text(Path.GetFileName(file.ProcessingFilepath) ?? "", new Style(Color.Green)), new Text(Path.GetFileName(file.SupportFilepath) ?? "", new Style(Color.Green)));
         }
 
         foreach (var file in files.Unknown)
         {
-            grid.AddRow([
-                new Text("!!", new Style(Color.Red)),
-                new Text(""),
-                new Text(""),
-                new Text(Path.GetFileName(file), new Style(Color.Red)),
-                new Text(""),
-                new Text(""),
-            ]);
+            grid.AddRow(new Text("!!", new Style(Color.Red)), new Text(""), new Text(""), new Text(Path.GetFileName(file), new Style(Color.Red)), new Text(""), new Text(""));
         }
 
         OutputHeader("Files to Process");

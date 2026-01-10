@@ -1,4 +1,5 @@
 using MawMediaPublisher.Finder;
+using MawMediaPublisher.Models;
 
 namespace MawMediaPublisher.Tests;
 
@@ -97,7 +98,7 @@ public class MediaFinderTets
 
         var media = results.Media.First();
 
-        Assert.Equal(Models.MediaType.Image, media.MediaType);
+        Assert.Equal(MediaType.Image, media.MediaType);
         Assert.Equal(nef, media.OriginalFilepath);
         Assert.Equal(dng, media.ProcessingFilepath);
         Assert.Equal(pp3, media.SupportFilepath);

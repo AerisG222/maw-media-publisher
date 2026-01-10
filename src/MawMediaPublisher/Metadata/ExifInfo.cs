@@ -14,8 +14,8 @@ public class ExifInfo
     public JsonElement Json { get; init; }
     int _height = int.MinValue;
     int _width = int.MinValue;
-    decimal? _latitude = null;
-    decimal? _longitude = null;
+    decimal? _latitude;
+    decimal? _longitude;
     DateTime _createDate = DateTime.MinValue;
 
     public ExifInfo(JsonElement json)

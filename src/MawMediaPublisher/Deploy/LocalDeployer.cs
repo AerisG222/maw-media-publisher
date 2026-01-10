@@ -1,9 +1,9 @@
 using System.IO.Compression;
 using CliWrap;
 using CliWrap.Buffered;
-using Spectre.Console;
 using MawMediaPublisher.Models;
 using MawMediaPublisher.Scale;
+using Spectre.Console;
 
 namespace MawMediaPublisher.Deploy;
 
