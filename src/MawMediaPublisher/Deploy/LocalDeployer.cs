@@ -41,23 +41,51 @@ public class LocalDeployer
 
     static async Task RunLocalImport(Category category, string dstDir)
     {
+        const int maxAttempts = 5;
+        var attempt = 1;
         var script = Path.Combine(dstDir, Path.GetFileName(category.ScriptFile));
 
-        using var cmd = Cli
-            .Wrap("bash")
-            .WithArguments($"{script} dev")
-            .WithWorkingDirectory(dstDir)
-            .ExecuteBufferedAsync();
-
-        var cmdResult = await cmd;
-
-        if (!cmdResult.IsSuccess || !string.IsNullOrWhiteSpace(cmdResult.StandardError))
+        while (attempt <= maxAttempts)
         {
-            AnsiConsole.MarkupLine("[bold red]** Error running db import script: **[/]");
-            AnsiConsole.MarkupLineInterpolated($"[bold red] StdErr: [/][red]{cmdResult.StandardError}[/]");
-            AnsiConsole.MarkupLineInterpolated($"[bold yellow] StdOut: [/][yellow]{cmdResult.StandardOutput}[/]");
+            using var cmd = Cli
+                .Wrap("bash")
+                .WithArguments($"{script} dev")
+                .WithWorkingDirectory(dstDir)
+                .WithValidation(CommandResultValidation.None)
+                .ExecuteBufferedAsync();
 
-            throw new ApplicationException("Error running import script!");
+            var cmdResult = await cmd;
+
+            if (cmdResult.IsSuccess && string.IsNullOrWhiteSpace(cmdResult.StandardError))
+            {
+                break;
+            }
+
+            AnsiConsole.MarkupLine("[bold red]** Error running db import script: **[/]");
+
+            if (!string.IsNullOrWhiteSpace(cmdResult.StandardError))
+            {
+                AnsiConsole.MarkupLineInterpolated($"[bold red] StdErr: [/][red]{cmdResult.StandardError}[/]");
+            }
+
+            if (!string.IsNullOrWhiteSpace(cmdResult.StandardOutput))
+            {
+                AnsiConsole.MarkupLineInterpolated($"[bold yellow] StdOut: [/][yellow]{cmdResult.StandardOutput}[/]");
+            }
+
+            if(attempt < maxAttempts)
+            {
+                AnsiConsole.MarkupLine("");
+                AnsiConsole.MarkupLine("[bold yellow]** If the dev db was not started, please start it now.  Otherwise, you may also tweak the script. **[/]");
+                AnsiConsole.MarkupLine("[blue]** Hit Enter to continue or CTL-C to exit **[/]");
+                Console.ReadLine();
+
+                attempt++;
+            }
+            else
+            {
+                throw new ApplicationException("Error running import script!");
+            }
         }
     }
 
