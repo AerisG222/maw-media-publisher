@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Amazon.Runtime;
 using Amazon.Runtime.CredentialManagement;
 using Amazon.S3;
@@ -75,18 +76,71 @@ class AwsS3Archiver
         }
 
         ssoCredentials.Options.ClientName = "MawMediaPublisher";
-        ssoCredentials.Options.SsoVerificationCallback = async args =>
+
+        ssoCredentials.Options.SsoVerificationCallback = args =>
         {
             AnsiConsole.MarkupLineInterpolated($"[bold green]Please verify the following code matches what is in the browser before logging in:[/] [bold yellow]{args.UserCode}[/]");
+            AnsiConsole.MarkupLine($"[grey]If your browser doesn't open automatically, visit:[/] {args.VerificationUriComplete}");
 
-            await Cli
-                .Wrap("xdg-open")
-                .WithArguments(args.VerificationUriComplete)
-                .ExecuteAsync();
+            if (IsHeadless())
+            {
+                AnsiConsole.MarkupLine("[yellow]Headless environment detected — skipping automatic browser open.[/]");
+                return;
+            }
+
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await VerifyInBrowser(args);
+                }
+                catch (Exception inner)
+                {
+                    AnsiConsole.MarkupLine($"[red]Failed to open the browser automatically: {inner.Message}[/]");
+                    AnsiConsole.MarkupLine($"[yellow]Please copy and paste the following URL into your browser:[/] {args.VerificationUriComplete}");
+                }
+            });
         };
 
         ssoCredentials.Options.SupportsGettingNewToken = true;
 
         return ssoCredentials;
+    }
+
+    static async Task VerifyInBrowser(SsoVerificationArguments args)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            await Cli
+                .Wrap("cmd")
+                .WithArguments([
+                    "/c",
+                    "start",
+                    "",
+                    args.VerificationUriComplete
+                ])
+                .ExecuteAsync();
+        }
+        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            await Cli
+                .Wrap("open")
+                .WithArguments([args.VerificationUriComplete])
+                .ExecuteAsync();
+        }
+        else
+        {
+            await Cli
+                .Wrap("xdg-open")
+                .WithArguments([args.VerificationUriComplete])
+                .ExecuteAsync();
+        }
+    }
+
+    static bool IsHeadless()
+    {
+        return RuntimeInformation.IsOSPlatform(OSPlatform.Linux) &&
+            string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DISPLAY")) &&
+            string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
     }
 }
