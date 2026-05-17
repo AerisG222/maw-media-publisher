@@ -81,7 +81,7 @@ internal sealed class FullProcessCommand
         public string SshPrivateKeyFile { get; init; } = "";
     }
 
-    public async override Task<int> ExecuteAsync(
+    protected async override Task<int> ExecuteAsync(
         CommandContext context,
         Settings settings,
         CancellationToken token = default
