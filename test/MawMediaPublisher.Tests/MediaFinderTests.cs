@@ -54,7 +54,7 @@ public class MediaFinderTets
         var mf = new MediaFinder();
         string[] files = [
             "/a/b/1.jpg",
-            "/a/b/1.pp3"
+            "/a/b/1.jpg.pp3"
         ];
 
         var results = mf.BuildMediaFiles(files);
@@ -69,7 +69,7 @@ public class MediaFinderTets
         var mf = new MediaFinder();
         string[] files = [
             "/a/b/1.jpg",
-            "/a/c/1.pp3"
+            "/a/c/1.jpg.pp3"
         ];
 
         var results = mf.BuildMediaFiles(files);

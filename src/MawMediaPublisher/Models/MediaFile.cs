@@ -14,6 +14,7 @@ public class MediaFile
     public float? VideoDuration { get; set; }
     public IEnumerable<ScaledFile> ScaledFiles { get; set; } = [];
     public string Slug => SlugHelper.MakeSafeSlug(Path.GetFileNameWithoutExtension(OriginalFilepath));
+    public string FilepathToProcess => ProcessingFilepath ?? OriginalFilepath;
 
     public MediaFile(string file, MediaType type)
     {

@@ -10,7 +10,7 @@ class MediaScaler
     public async Task<IEnumerable<ScaledFile>> ScaleMedia(Category category, MediaFile file)
     {
         var results = new List<ScaledFile>();
-        var srcFile = new FileInfo(file.ProcessingFilepath ?? file.OriginalFilepath);
+        var srcFile = new FileInfo(file.FilepathToProcess);
         var origDir = srcFile.Directory!;
         var scales = GetScalesForDimensions(file.Exif!.Width, file.Exif.Height, file.MediaType == MediaType.Video);
 

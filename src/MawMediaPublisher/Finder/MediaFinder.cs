@@ -29,13 +29,13 @@ public class MediaFinder
         {
             if (RecognizedExtensions.IsSourceImage(file))
             {
-                sourceImages.Add(ToKey(file), new MediaFile(file, MediaType.Image));
+                sourceImages.Add(DropExtensionFromFullname(file), new MediaFile(file, MediaType.Image));
                 continue;
             }
 
             if (RecognizedExtensions.IsSourceVideo(file))
             {
-                sourceVideos.Add(ToKey(file), new MediaFile(file, MediaType.Video));
+                sourceVideos.Add(DropExtensionFromFullname(file), new MediaFile(file, MediaType.Video));
                 continue;
             }
 
@@ -49,44 +49,9 @@ public class MediaFinder
         }
 
         var unusedSupportFiles = supportFiles.ToHashSet();
-        var dngFiles = supportFiles.Where(sf => RecognizedExtensions.IsDng(sf)).ToList();
-        var pp3Files = supportFiles.Where(sf => RecognizedExtensions.IsPp3(sf)).ToList();
 
-        // first process dngs and when doing so, see if those support files reference other support files
-        // note: expected naming format: abc.DNG is for abc.NEF
-        foreach (var dng in dngFiles)
-        {
-            if (sourceImages.TryGetValue(ToKey(dng), out var media))
-            {
-                media.ProcessingFilepath = dng;
-                unusedSupportFiles.Remove(dng);
-                AssociatePp3(unusedSupportFiles, dng, media);
-            }
-            else
-            {
-                // dngs are also valid images, so if it doesn't lineup w/ another file, lets
-                // treat it as its own image
-                var dngMedia = new MediaFile(dng, MediaType.Image);
-
-                sourceImages.Add(ToKey(dng), dngMedia);
-                unusedSupportFiles.Remove(dng);
-                AssociatePp3(unusedSupportFiles, dng, dngMedia);
-            }
-        }
-
-        // now process remaining pp3s that may be associated with the source image
-        foreach (var pp3 in pp3Files)
-        {
-            if (sourceImages.TryGetValue(ToKey(pp3), out var media))
-            {
-                if (media.SupportFilepath == null)
-                {
-                    // a more specific pp3 was not set, so set it - otherwise ignore
-                    media.SupportFilepath = pp3;
-                    unusedSupportFiles.Remove(pp3);
-                }
-            }
-        }
+        AssociateDngToSourceImages(sourceImages, supportFiles, unusedSupportFiles);
+        AssociatePp3ToSourceImages(sourceImages, supportFiles, unusedSupportFiles);
 
         return new FindResults(
             sourceImages.Values.Concat(sourceVideos.Values),
@@ -94,25 +59,56 @@ public class MediaFinder
         );
     }
 
-    static void AssociatePp3(HashSet<string> unusedSupportFiles, string dng, MediaFile media)
-    {
-        // now see if we have pp3 support file for the processing file
-        // currently does not handle <dng-file-name>.dng.<garbage>.pp3
-        // so we will take the first in the sorted list as the desired pp3
-        // and leave the rest as unknown
-        var pp3 = unusedSupportFiles
-            .Where(usf => usf.StartsWith(dng))
-            .Where(f => RecognizedExtensions.IsPp3(f))
-            .OrderBy(f => f.Length)
-            .FirstOrDefault();
+    void AssociateDngToSourceImages(
+        Dictionary<string, MediaFile> sourceImages,
+        List<string> supportFiles,
+        HashSet<string> unusedSupportFiles
+    ) {
+        var dngFiles = supportFiles.Where(sf => RecognizedExtensions.IsDng(sf)).ToList();
 
-        if (pp3 != null)
+        // note: expected naming format: abc.DNG is for abc.NEF
+        foreach (var dng in dngFiles)
         {
-            media.SupportFilepath = pp3;
-            unusedSupportFiles.Remove(pp3);
+            if (sourceImages.TryGetValue(DropExtensionFromFullname(dng), out var media))
+            {
+                media.ProcessingFilepath = dng;
+                unusedSupportFiles.Remove(dng);
+            }
+            else
+            {
+                // dngs are also valid images, so if it doesn't lineup w/ another file, lets
+                // treat it as its own image
+                var dngMedia = new MediaFile(dng, MediaType.Image);
+
+                sourceImages.Add(DropExtensionFromFullname(dng), dngMedia);
+                unusedSupportFiles.Remove(dng);
+            }
         }
     }
 
-    string ToKey(string file) =>
+    static void AssociatePp3ToSourceImages(
+        Dictionary<string, MediaFile> sourceImages,
+        List<string> supportFiles,
+        HashSet<string> unusedSupportFiles
+    ) {
+        var pp3Files = supportFiles.Where(sf => RecognizedExtensions.IsPp3(sf)).ToList();
+
+        foreach (var pp3 in pp3Files)
+        {
+            var imageFileForPp3 = DropExtensionFromFullname(pp3);
+
+            // support files like abc123.NEF.pp3 or abc123.dng.pp3
+            if (sourceImages.TryGetValue(DropExtensionFromFullname(imageFileForPp3), out var media))
+            {
+                if(string.Equals(media.FilepathToProcess, imageFileForPp3, StringComparison.OrdinalIgnoreCase))
+                {
+                    media.SupportFilepath = pp3;
+                    unusedSupportFiles.Remove(pp3);
+                }
+            }
+        }
+    }
+
+    static string DropExtensionFromFullname(string file) =>
         Path.Combine(Path.GetDirectoryName(file) ?? "", Path.GetFileNameWithoutExtension(file));
 }
