@@ -111,6 +111,8 @@ class PhotoScaler
 
         args.AddRange([
             "-colorspace", "sRGB",
+            "-depth", "8",
+            "-define", "heic:chroma=420",
             "-quality", "72",
             "-strip",
             dst
