@@ -61,6 +61,7 @@ class ScriptWriter
         await writer.WriteLineAsync(
             $$"""
             podman run --rm \
+                --restart no \
                 --replace \
                 --pod "${POD}" \
                 --name pg_import \
