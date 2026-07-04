@@ -23,7 +23,6 @@ class SqlWriter
         await WritePreamble(sw);
         await WriteCategory(sw, category);
         await WriteCategoryRoles(sw, category);
-        await WriteLocations(sw, category);
         await WriteMedia(sw, category);
         await WriteCategoryMedia(sw, category);
         await WriteRefreshMaterializedViews(sw);
@@ -80,61 +79,15 @@ class SqlWriter
         }
     }
 
-    static async Task WriteLocations(StreamWriter writer, Category category)
-    {
-        foreach (var media in category.Media.Where(x => x.Exif?.Latitude != null))
-        {
-            await writer.WriteLineAsync(
-                $"""
-                IF NOT EXISTS (
-                    SELECT 1
-                    FROM media.location
-                    WHERE
-                        latitude = {SqlGpsCoord(media.Exif!.Latitude)}
-                        AND
-                        longitude = {SqlGpsCoord(media.Exif.Longitude)}
-                )
-                THEN
-                    INSERT INTO media.location (
-                        id,
-                        latitude,
-                        longitude
-                    ) VALUES (
-                        {SqlAsString(Guid.CreateVersion7())},
-                        {SqlGpsCoord(media.Exif.Latitude)},
-                        {SqlGpsCoord(media.Exif.Longitude)}
-                    );
-                END IF;
-
-                """);
-        }
-    }
-
     static async Task WriteMedia(StreamWriter writer, Category category)
     {
         foreach (var media in category.Media)
         {
-            var locationId =
-                media.Exif?.Latitude == null || media.Exif?.Longitude == null
-                    ? "NULL"
-                    :   $"""
-                            (
-                                SELECT id
-                                FROM media.location
-                                WHERE
-                                    latitude = {SqlGpsCoord(media.Exif!.Latitude)}
-                                    AND
-                                    longitude = {SqlGpsCoord(media.Exif.Longitude)}
-                            )
-                        """;
-
             await writer.WriteLineAsync(
                 $"""
                 INSERT INTO media.media (
                     id,
                     type_id,
-                    location_id,
-                    location_override_id,
                     created,
                     created_by,
                     modified,
@@ -144,8 +97,6 @@ class SqlWriter
                 ) VALUES (
                     {SqlAsString(media.Id)},
                     {SqlMediaType(media.MediaType)},
-                    {locationId},
-                    {SqlString(null)},
                     {SqlDate(media.Exif!.CreateDate)},
                     {SqlAsString(ADMIN_ID)},
                     {SqlDate(NOW)},
