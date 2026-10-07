@@ -9,6 +9,8 @@ public class SlugHelper
         var slug = value
                 .Replace(" ", "-")
                 .Replace("_", "-")
+                .Replace("/", "-")
+                .Replace("\\", "-")
                 .ToLower();
 
         // remove consecutive dashes
