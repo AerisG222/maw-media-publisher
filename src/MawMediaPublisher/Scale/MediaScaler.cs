@@ -30,31 +30,32 @@ class MediaScaler
         var fullResults = new Dictionary<bool, ScaledFile>();
         var deferred = new List<(int Index, ScaleSpec Scale)>();
 
+        var toScale = new List<ScaleSpec>();
+
         foreach (var (scale, isMaxFit) in scales)
         {
             if (isMaxFit)
             {
-                deferred.Add((results.Count + deferred.Count, scale));
+                deferred.Add((results.Count + toScale.Count + deferred.Count, scale));
                 continue;
             }
 
-            var scaleDir = Path.Combine(origDir.FullName, scale.Code);
+            toScale.Add(scale);
+        }
 
-            CreateDir(scaleDir);
+        var scaled = file.MediaType switch
+        {
+            // photos are scaled to all sizes in a single pass so the source is only decoded once
+            MediaType.Image => await _photoScaler.Scale(category, srcFile, origDir.FullName, toScale),
+            MediaType.Video => await ScaleVideo(category, file, srcFile, origDir.FullName, toScale),
+            _ => throw new InvalidOperationException($"Unexpected media type: {file.MediaType}")
+        };
 
-            var result = file.MediaType switch
-            {
-                MediaType.Image => await _photoScaler.Scale(category, srcFile, scaleDir, scale),
-                MediaType.Video => await _videoScaler.Scale(category, srcFile, scaleDir, scale, file.VideoDuration),
-                _ => throw new InvalidOperationException($"Unexpected media type: {file.MediaType}")
-            };
+        results.AddRange(scaled);
 
-            results.Add(result);
-
-            if (scale.Width == int.MaxValue)
-            {
-                fullResults[scale.IsPoster] = result;
-            }
+        foreach (var result in scaled.Where(r => r.Scale.Width == int.MaxValue))
+        {
+            fullResults[result.Scale.IsPoster] = result;
         }
 
         // insert in original scale order so the results look the same as before
@@ -88,6 +89,22 @@ class MediaScaler
             {
                 File.Delete(tif);
             }
+        }
+
+        return results;
+    }
+
+    async Task<List<ScaledFile>> ScaleVideo(Category category, MediaFile file, FileInfo srcFile, string baseDir, IEnumerable<ScaleSpec> scales)
+    {
+        var results = new List<ScaledFile>();
+
+        foreach (var scale in scales)
+        {
+            var scaleDir = Path.Combine(baseDir, scale.Code);
+
+            CreateDir(scaleDir);
+
+            results.Add(await _videoScaler.Scale(category, srcFile, scaleDir, scale, file.VideoDuration));
         }
 
         return results;

@@ -8,48 +8,65 @@ class PhotoScaler
 {
     ExifExporter _exifExporter = new();
 
-    public async Task<ScaledFile> Scale(
+    public async Task<List<ScaledFile>> Scale(
         Category category,
         FileInfo src,
-        string dstDir,
-        ScaleSpec scale
+        string baseDir,
+        IEnumerable<ScaleSpec> scales
     )
     {
         var dstFilename = $"{Path.GetFileNameWithoutExtension(src.Name)}.avif";
-        var dst = new FileInfo(Path.Combine(dstDir, dstFilename));
-        ExifInfo? exif;
+        var targets = scales
+            .Select(scale => new ScaleTarget(scale, new FileInfo(Path.Combine(baseDir, scale.Code, dstFilename))))
+            .ToList();
 
-        // see if it exists as we may be trying to reprocess
-        if (!dst.Exists)
+        foreach (var target in targets)
         {
-            await ScaleImage(src, dst, scale);
+            Directory.CreateDirectory(target.Dst.DirectoryName!);
         }
 
-        try
+        // see if they exist as we may be trying to reprocess
+        var missing = targets.Where(t => !t.Dst.Exists).ToList();
+
+        if (missing.Count > 0)
         {
-            exif = await _exifExporter.Export(dst);
-        }
-        catch
-        {
-            // if file existed, it was corrput, so lets try again
-            File.Delete(dst.FullName);
-            await ScaleImage(src, dst, scale);
-            exif = await _exifExporter.Export(dst);
+            await ScaleImage(src, missing);
         }
 
-        dst.Refresh();
+        var results = new List<ScaledFile>();
 
-        return new ScaledFile(
-            Guid.CreateVersion7(),
-            scale,
-            category.BuildMediaFilePath(scale, dst.Name),
-            exif.Width,
-            exif.Height,
-            dst.Length
-        );
+        foreach (var target in targets)
+        {
+            ExifInfo? exif;
+
+            try
+            {
+                exif = await _exifExporter.Export(target.Dst);
+            }
+            catch
+            {
+                // if file existed, it was corrupt, so lets try again (just this one)
+                File.Delete(target.Dst.FullName);
+                await ScaleImage(src, [target]);
+                exif = await _exifExporter.Export(target.Dst);
+            }
+
+            target.Dst.Refresh();
+
+            results.Add(new ScaledFile(
+                Guid.CreateVersion7(),
+                target.Scale,
+                category.BuildMediaFilePath(target.Scale, target.Dst.Name),
+                exif.Width,
+                exif.Height,
+                target.Dst.Length
+            ));
+        }
+
+        return results;
     }
 
-    static async Task ScaleImage(FileInfo src, FileInfo dst, ScaleSpec scale)
+    static async Task ScaleImage(FileInfo src, IReadOnlyList<ScaleTarget> targets)
     {
         if (RecognizedExtensions.IsRaw(src.Name))
         {
@@ -70,56 +87,87 @@ class PhotoScaler
 
         using var cmd = Cli
             .Wrap("magick")
-            .WithArguments(GetImageMagickArgs(src.FullName, dst.FullName, scale))
+            .WithArguments(GetImageMagickArgs(src.FullName, targets))
             .ExecuteAsync();
 
         await cmd;
     }
 
     // https://usage.imagemagick.org/resize/
-    static IEnumerable<string> GetImageMagickArgs(string src, string dst, ScaleSpec scale)
+    // https://usage.imagemagick.org/files/#mpr
+    //
+    // all scales are produced from a single magick process so the (potentially very large) source is only decoded
+    // once.  the source is kept in memory (mpr:orig) for the 'full' size, and a linear RGB copy (mpr:lin) is kept
+    // for resizing, then each scale is resized / written from that copy inside its own parentheses.  output is
+    // identical to running magick separately for each scale.
+    static IEnumerable<string> GetImageMagickArgs(string src, IReadOnlyList<ScaleTarget> targets)
     {
+        var full = targets.Where(t => t.Scale.Width == int.MaxValue).ToList();
+        var resized = targets.Where(t => t.Scale.Width != int.MaxValue).ToList();
+
         List<string> args = [
-            src
+            "-respect-parentheses",
+            src,
+            "-write", "mpr:orig"
         ];
 
-        if (scale.Width != int.MaxValue)
+        if (resized.Count > 0)
         {
-            // interesting, if we include this above, magick consumes a lot of mem and crashes the process
-            // when trying to process the 'full' size.  in this case, we don't try to use a giant size, but
-            // looks like magick doesn't like 2 colorspace cmds side by side...
+            // interesting, if we include this for the 'full' size, magick consumes a lot of mem and crashes the
+            // process.  looks like magick doesn't like 2 colorspace cmds side by side, so 'full' uses mpr:orig
             args.AddRange([
-                "-colorspace", "RGB"
+                "-colorspace", "RGB",
+                "-write", "mpr:lin"
             ]);
+        }
 
-            if (scale.IsCropToFill)
+        args.Add("+delete");
+
+        foreach (var target in resized)
+        {
+            args.AddRange(["(", "mpr:lin"]);
+
+            if (target.Scale.IsCropToFill)
             {
                 args.AddRange([
-                    "-resize", $"{scale.Width}x{scale.Height}^",
+                    "-resize", $"{target.Scale.Width}x{target.Scale.Height}^",
                     "-gravity", "center",
-                    "-crop", $"{scale.Width}x{scale.Height}+0+0"
+                    "-crop", $"{target.Scale.Width}x{target.Scale.Height}+0+0"
                 ]);
             }
             else
             {
                 // the > at the end means "only scale down, not up"
                 args.AddRange([
-                    "-resize", $"{scale.Width}x{scale.Height}>"
+                    "-resize", $"{target.Scale.Width}x{target.Scale.Height}>"
                 ]);
             }
+
+            args.AddRange(GetAvifArgs(target.Dst.FullName));
+            args.AddRange([")", "+delete"]);
         }
 
-        args.AddRange([
-            "-colorspace", "sRGB",
-            "-depth", "8",
-            "-define", "heic:chroma=420",
-            "-quality", "72",
-            "-strip",
-            dst
-        ]);
+        foreach (var target in full)
+        {
+            args.AddRange(["(", "mpr:orig"]);
+            args.AddRange(GetAvifArgs(target.Dst.FullName));
+            args.AddRange([")", "+delete"]);
+        }
+
+        // everything has been written above, so there is nothing left for the final output
+        args.Add("null:");
 
         return args;
     }
+
+    static IEnumerable<string> GetAvifArgs(string dst) => [
+        "-colorspace", "sRGB",
+        "-depth", "8",
+        "-define", "heic:chroma=420",
+        "-quality", "72",
+        "-strip",
+        "-write", dst
+    ];
 
     static IEnumerable<string> GetRawTherapeeArgs(string src, string dstTif)
     {
@@ -131,4 +179,6 @@ class PhotoScaler
             "-c", src
         ];
     }
+
+    record ScaleTarget(ScaleSpec Scale, FileInfo Dst);
 }
