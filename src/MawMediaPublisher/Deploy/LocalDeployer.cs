@@ -49,7 +49,7 @@ public class LocalDeployer
         {
             using var cmd = Cli
                 .Wrap("bash")
-                .WithArguments($"{script} dev")
+                .WithArguments([script, "dev"])
                 .WithWorkingDirectory(dstDir)
                 .WithValidation(CommandResultValidation.None)
                 .ExecuteBufferedAsync();
