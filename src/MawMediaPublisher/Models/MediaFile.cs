@@ -13,12 +13,14 @@ public class MediaFile
     public ExifInfo? Exif { get; set; }
     public float? VideoDuration { get; set; }
     public IEnumerable<ScaledFile> ScaledFiles { get; set; } = [];
-    public string Slug => SlugHelper.MakeSafeSlug(Path.GetFileNameWithoutExtension(OriginalFilepath));
+    // defaults to the filename, but may be changed by the finder if it collides w/ another media in the category
+    public string Slug { get; set; }
     public string FilepathToProcess => ProcessingFilepath ?? OriginalFilepath;
 
     public MediaFile(string file, MediaType type)
     {
         OriginalFilepath = file;
         MediaType = type;
+        Slug = SlugHelper.MakeSafeSlug(Path.GetFileNameWithoutExtension(file));
     }
 }

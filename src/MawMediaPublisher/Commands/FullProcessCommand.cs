@@ -17,6 +17,7 @@ internal sealed class FullProcessCommand
     const int STATUS_SUCCESS = 0;
     const int STATUS_USER_CANCELLED = 1;
     const int STATUS_DESTINATION_EXISTS = 2;
+    const int STATUS_FILE_CLASH = 3;
 
     static readonly MediaFinder _mediaFinder = new();
     static readonly ExifExporter _exifExporter = new();
@@ -112,6 +113,13 @@ internal sealed class FullProcessCommand
         }
 
         var foundFiles = _mediaFinder.FindMedia(category.SourceDirectory);
+
+        if (foundFiles.FileClashes.Count > 0)
+        {
+            PrintFileClashes(foundFiles);
+
+            return STATUS_FILE_CLASH;
+        }
 
         if (settings.Interactive && !PrintMediaToProcessAndContinue(foundFiles))
         {
@@ -310,6 +318,24 @@ internal sealed class FullProcessCommand
         }
 
         return ContinuePrompt();
+    }
+
+    static void PrintFileClashes(FindResults files)
+    {
+        OutputHeader("File Name Clashes");
+
+        AnsiConsole.MarkupLine("[bold red]!!** The following files have the same name and would overwrite each other's scaled files.  Please rename them and try again. **!![/]");
+        AnsiConsole.WriteLine();
+
+        foreach (var clash in files.FileClashes)
+        {
+            foreach (var file in clash)
+            {
+                AnsiConsole.MarkupLineInterpolated($"[red]  {Path.GetFileName(file)}[/]");
+            }
+
+            AnsiConsole.WriteLine();
+        }
     }
 
     static string MediaTypeDisplayForGrid(MediaType mt) => mt switch
