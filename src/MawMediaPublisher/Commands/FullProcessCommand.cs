@@ -126,6 +126,12 @@ internal sealed class FullProcessCommand
             return STATUS_USER_CANCELLED;
         }
 
+        // interactive mode lists these in the grid above, otherwise make sure they are not silently skipped
+        if (!settings.Interactive && foundFiles.Unknown.Any())
+        {
+            PrintUnknownFiles(foundFiles);
+        }
+
         category.Media = foundFiles.Media;
 
         await ProcessCategoryMedia(category);
@@ -321,6 +327,18 @@ internal sealed class FullProcessCommand
         }
 
         return ContinuePrompt();
+    }
+
+    static void PrintUnknownFiles(FindResults files)
+    {
+        AnsiConsole.MarkupLine("[bold red]!! The following files are not recognized and will not be processed !![/]");
+
+        foreach (var file in files.Unknown)
+        {
+            AnsiConsole.MarkupLineInterpolated($"[red]  {Path.GetFileName(file)}[/]");
+        }
+
+        AnsiConsole.WriteLine();
     }
 
     static void PrintFileClashes(FindResults files)

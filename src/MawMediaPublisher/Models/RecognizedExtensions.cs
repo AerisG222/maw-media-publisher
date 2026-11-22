@@ -10,9 +10,13 @@ public static class RecognizedExtensions
     public static readonly string[] SourceImageExtensions = [
         ".AVIF",
         ".HEIC",
+        ".JPEG",
         ".JPG",
         ".NEF",
-        ".PNG"
+        ".PNG",
+        ".TIF",
+        ".TIFF",
+        ".WEBP"
     ];
 
     public static readonly string[] SourceVideoExtensions = [
