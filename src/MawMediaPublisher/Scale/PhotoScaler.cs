@@ -6,7 +6,7 @@ namespace MawMediaPublisher.Scale;
 
 class PhotoScaler
 {
-    ExifExporter _exifExporter = new();
+    OutputInspector _inspector = new();
 
     public async Task<List<ScaledFile>> Scale(
         Category category,
@@ -33,23 +33,12 @@ class PhotoScaler
             await ScaleImage(src, missing);
         }
 
+        var info = await _inspector.InspectWithRetry(targets, t => t.Dst, invalid => ScaleImage(src, invalid));
         var results = new List<ScaledFile>();
 
         foreach (var target in targets)
         {
-            ExifInfo? exif;
-
-            try
-            {
-                exif = await _exifExporter.Export(target.Dst);
-            }
-            catch
-            {
-                // if file existed, it was corrupt, so lets try again (just this one)
-                File.Delete(target.Dst.FullName);
-                await ScaleImage(src, [target]);
-                exif = await _exifExporter.Export(target.Dst);
-            }
+            var dims = info[target.Dst.FullName];
 
             target.Dst.Refresh();
 
@@ -57,8 +46,8 @@ class PhotoScaler
                 Guid.CreateVersion7(),
                 target.Scale,
                 category.BuildMediaFilePath(target.Scale, target.Dst.Name),
-                exif.Width,
-                exif.Height,
+                dims.Width,
+                dims.Height,
                 target.Dst.Length
             ));
         }

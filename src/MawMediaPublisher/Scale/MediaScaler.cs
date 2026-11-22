@@ -47,7 +47,7 @@ class MediaScaler
         {
             // photos are scaled to all sizes in a single pass so the source is only decoded once
             MediaType.Image => await _photoScaler.Scale(category, srcFile, origDir.FullName, toScale),
-            MediaType.Video => await ScaleVideo(category, file, srcFile, origDir.FullName, toScale),
+            MediaType.Video => await _videoScaler.Scale(category, srcFile, origDir.FullName, toScale, file.VideoDuration),
             _ => throw new InvalidOperationException($"Unexpected media type: {file.MediaType}")
         };
 
@@ -89,22 +89,6 @@ class MediaScaler
             {
                 File.Delete(tif);
             }
-        }
-
-        return results;
-    }
-
-    async Task<List<ScaledFile>> ScaleVideo(Category category, MediaFile file, FileInfo srcFile, string baseDir, IEnumerable<ScaleSpec> scales)
-    {
-        var results = new List<ScaledFile>();
-
-        foreach (var scale in scales)
-        {
-            var scaleDir = Path.Combine(baseDir, scale.Code);
-
-            CreateDir(scaleDir);
-
-            results.Add(await _videoScaler.Scale(category, srcFile, scaleDir, scale, file.VideoDuration));
         }
 
         return results;

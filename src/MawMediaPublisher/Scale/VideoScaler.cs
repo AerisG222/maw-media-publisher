@@ -6,49 +6,66 @@ namespace MawMediaPublisher.Scale;
 
 class VideoScaler
 {
-    ExifExporter _exifExporter = new();
+    OutputInspector _inspector = new();
     DurationInspector _durationInspector = new();
 
-    public async Task<ScaledFile> Scale(
+    public async Task<List<ScaledFile>> Scale(
         Category category,
         FileInfo src,
-        string dstDir,
-        ScaleSpec scale,
+        string baseDir,
+        IEnumerable<ScaleSpec> scales,
         float? duration
     )
     {
-        var dstFilename = $"{Path.GetFileNameWithoutExtension(src.Name)}{(scale.IsPoster ? ".poster.avif" : ".mp4")}";
-        var dst = new FileInfo(Path.Combine(dstDir, dstFilename));
-        ExifInfo? exif;
+        var targets = scales
+            .Select(scale => new ScaleTarget(
+                scale,
+                new FileInfo(Path.Combine(
+                    baseDir,
+                    scale.Code,
+                    $"{Path.GetFileNameWithoutExtension(src.Name)}{(scale.IsPoster ? ".poster.avif" : ".mp4")}"
+                ))
+            ))
+            .ToList();
 
-        // see if it exists as we may be trying to reprocess
-        if (!dst.Exists)
+        foreach (var target in targets)
         {
-            await ScaleVideo(src, dst, scale, duration);
+            Directory.CreateDirectory(target.Dst.DirectoryName!);
+
+            // see if it exists as we may be trying to reprocess
+            if (!target.Dst.Exists)
+            {
+                await ScaleVideo(src, target.Dst, target.Scale, duration);
+            }
         }
 
-        try
+        var info = await _inspector.InspectWithRetry(targets, t => t.Dst, async invalid =>
         {
-            exif = await _exifExporter.Export(dst);
-        }
-        catch
+            foreach (var target in invalid)
+            {
+                await ScaleVideo(src, target.Dst, target.Scale, duration);
+            }
+        });
+
+        var results = new List<ScaledFile>();
+
+        foreach (var target in targets)
         {
-            // if file existed, it was corrput, so lets try again
-            File.Delete(dst.FullName);
-            await ScaleVideo(src, dst, scale, duration);
-            exif = await _exifExporter.Export(dst);
+            var dims = info[target.Dst.FullName];
+
+            target.Dst.Refresh();
+
+            results.Add(new ScaledFile(
+                Guid.CreateVersion7(),
+                target.Scale,
+                category.BuildMediaFilePath(target.Scale, target.Dst.Name),
+                dims.Width,
+                dims.Height,
+                target.Dst.Length
+            ));
         }
 
-        dst.Refresh();
-
-        return new ScaledFile(
-            Guid.CreateVersion7(),
-            scale,
-            category.BuildMediaFilePath(scale, dst.Name),
-            exif.Width,
-            exif.Height,
-            dst.Length
-        );
+        return results;
     }
 
     async Task ScaleVideo(FileInfo src, FileInfo dst, ScaleSpec scale, float? duration)
@@ -132,4 +149,6 @@ class VideoScaler
 
         return args;
     }
+
+    record ScaleTarget(ScaleSpec Scale, FileInfo Dst);
 }
