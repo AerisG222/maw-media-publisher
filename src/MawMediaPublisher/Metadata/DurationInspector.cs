@@ -1,3 +1,4 @@
+using System.Globalization;
 using CliWrap;
 using CliWrap.Buffered;
 
@@ -26,7 +27,7 @@ class DurationInspector
             throw new InvalidDataException($"Expected to get duration from ffprobe for {src.FullName}");
         }
 
-        if (float.TryParse(output, out var duration))
+        if (float.TryParse(output, NumberStyles.Float, CultureInfo.InvariantCulture, out var duration))
         {
             return duration;
         }

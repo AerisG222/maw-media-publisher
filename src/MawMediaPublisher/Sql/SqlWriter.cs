@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using MawMediaPublisher.Models;
 
@@ -70,7 +71,7 @@ class SqlWriter
                     created_by
                 ) VALUES (
                     {SqlAsString(category.Id)},
-                    (SELECT id FROM media.role WHERE name = '{role}'),
+                    (SELECT id FROM media.role WHERE name = {SqlString(role)}),
                     {SqlDate(NOW)},
                     {SqlAsString(ADMIN_ID)}
                 );
@@ -224,7 +225,7 @@ class SqlWriter
     static string SqlDate(DateTime? val) => val switch
     {
         null => "NULL",
-        _ => $"'{val.Value:yyyy-MM-dd HH:mm:ss}'"
+        _ => string.Create(CultureInfo.InvariantCulture, $"'{val.Value:yyyy-MM-dd HH:mm:ss}'")
     };
 
     static string SqlMediaType(MediaType? val) => val switch
@@ -241,16 +242,17 @@ class SqlWriter
             : SqlMediaType(val);
     }
 
+    // invariant culture so numbers are always written w/ a '.' decimal separator, regardless of the system locale
     static string SqlNonString<T>(T val) => val switch
     {
         null => "NULL",
-        _ => $"{val}"
+        _ => string.Create(CultureInfo.InvariantCulture, $"{val}")
     };
 
     static string SqlGpsCoord(decimal? val) => val switch
     {
         null => "NULL",
-        _ => $"{val:F6}"
+        _ => string.Create(CultureInfo.InvariantCulture, $"{val:F6}")
     };
 
     static string SqlJson(JsonElement? json) => json switch

@@ -215,7 +215,7 @@ public class ExifInfo
             DateTime.TryParseExact(
                 valElem.GetString(),
                 "yyyy:MM:dd HH:mm:ss",
-                DateTimeFormatInfo.CurrentInfo,
+                CultureInfo.InvariantCulture,
                 DateTimeStyles.AllowWhiteSpaces,
                 out DateTime dt
             )
