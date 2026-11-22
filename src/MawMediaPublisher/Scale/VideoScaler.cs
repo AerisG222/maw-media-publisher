@@ -31,21 +31,12 @@ class VideoScaler
         foreach (var target in targets)
         {
             Directory.CreateDirectory(target.Dst.DirectoryName!);
-
-            // see if it exists as we may be trying to reprocess
-            if (!target.Dst.Exists)
-            {
-                await ScaleVideo(src, target.Dst, target.Scale, duration);
-            }
         }
 
-        var info = await _inspector.InspectWithRetry(targets, t => t.Dst, async invalid =>
-        {
-            foreach (var target in invalid)
-            {
-                await ScaleVideo(src, target.Dst, target.Scale, duration);
-            }
-        });
+        // see if they exist as we may be trying to reprocess
+        await Encode(src, targets.Where(t => !t.Dst.Exists).ToList(), duration);
+
+        var info = await _inspector.InspectWithRetry(targets, t => t.Dst, invalid => Encode(src, invalid, duration));
 
         var results = new List<ScaledFile>();
 
@@ -68,20 +59,87 @@ class VideoScaler
         return results;
     }
 
-    async Task ScaleVideo(FileInfo src, FileInfo dst, ScaleSpec scale, float? duration)
+    async Task Encode(FileInfo src, IReadOnlyList<ScaleTarget> targets, float? duration)
+    {
+        foreach (var target in targets.Where(t => !t.Scale.IsPoster))
+        {
+            await ScaleVideo(src, target.Dst, target.Scale);
+        }
+
+        var posters = targets.Where(t => t.Scale.IsPoster).ToList();
+
+        if (posters.Count > 0)
+        {
+            await ScalePosters(src, posters, duration);
+        }
+    }
+
+    static async Task ScaleVideo(FileInfo src, FileInfo dst, ScaleSpec scale)
     {
         using var cmd = Cli
             .Wrap("ffmpeg")
-            .WithArguments(await GetFfmpegArgs(src.FullName, dst.FullName, scale, duration))
+            .WithArguments(GetFfmpegArgs(src.FullName, dst.FullName, scale))
             .ExecuteAsync();
 
         await cmd;
     }
 
+    // posters are produced by extracting a single (lossless) frame and then scaling that like a photo, rather than
+    // running ffmpeg for each poster size.  this is faster and lets us use the same avif encoder as photos, which
+    // gives noticeably better quality for the same size than encoding the poster w/ svt-av1.
+    async Task ScalePosters(FileInfo src, IReadOnlyList<ScaleTarget> posters, float? duration)
+    {
+        var frame = $"{src.FullName}.poster.png";
+
+        // use the duration already captured for the media file, only probe if it wasn't provided
+        duration ??= await _durationInspector.Inspect(src);
+
+        try
+        {
+            using var cmd = Cli
+                .Wrap("ffmpeg")
+                .WithArguments(GetFrameExtractArgs(src.FullName, frame, duration > 2))
+                .ExecuteAsync();
+
+            await cmd;
+
+            await AvifWriter.Write(frame, posters, AvifWriter.POSTER_QUALITY);
+        }
+        finally
+        {
+            File.Delete(frame);
+        }
+    }
+
+    static IEnumerable<string> GetFrameExtractArgs(string src, string dst, bool skipIntro)
+    {
+        List<string> args = [
+            "-y"
+        ];
+
+        // seek to 2s (if the video is long enough) to avoid black / fade-in frames at the start
+        if (skipIntro)
+        {
+            args.AddRange(["-ss", "00:00:02"]);
+        }
+
+        args.AddRange([
+            "-i", src,
+            "-frames:v", "1",
+            // convert to square pixels (if needed) so the poster has the correct aspect ratio once scaled as a photo
+            "-vf", "scale='trunc(iw*sar)':ih,setsar=1",
+            // 16bit rgb png to avoid any loss before scaling
+            "-pix_fmt", "rgb48be",
+            dst
+        ]);
+
+        return args;
+    }
+
     // https://trac.ffmpeg.org/wiki/Encode/AV1#SVT-AV1
     // https://www.ffmpeg.org/ffmpeg-all.html#scale-1
     // https://evilmartians.com/chronicles/better-web-video-with-av1-codec
-    async Task<IEnumerable<string>> GetFfmpegArgs(string src, string dst, ScaleSpec scale, float? duration)
+    static IEnumerable<string> GetFfmpegArgs(string src, string dst, ScaleSpec scale)
     {
         List<string> args = [
             "-i", src,
@@ -119,23 +177,6 @@ class VideoScaler
             ]);
         }
 
-        if (scale.IsPoster)
-        {
-            // use the duration already captured for the media file, only probe if it wasn't provided
-            duration ??= await _durationInspector.Inspect(new FileInfo(src));
-
-            if (duration > 2)
-            {
-                args.AddRange([
-                    "-ss", "00:00:02",
-                ]);
-            }
-
-            args.AddRange([
-                "-frames:v", "1"
-            ]);
-        }
-
         // preset 6 / crf 35 tested against svt-av1 defaults (preset 8 / crf 35) on 1080p source: same size,
         // better vmaf (esp worst frames), ~1.9x encode time.  -g 240 = keyframe every ~8-10s for seeking.
         args.AddRange([
@@ -149,6 +190,4 @@ class VideoScaler
 
         return args;
     }
-
-    record ScaleTarget(ScaleSpec Scale, FileInfo Dst);
 }
