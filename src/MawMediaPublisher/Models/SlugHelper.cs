@@ -11,12 +11,13 @@ public class SlugHelper
                 .Replace("_", "-")
                 .Replace("/", "-")
                 .Replace("\\", "-")
-                .ToLower();
+                .ToLowerInvariant();
 
-        // remove consecutive dashes
-        var slugNoExtraDashes = Regex.Replace(slug, @"--+", "-");
+        // remove any unallowed characters first, so removing them can't leave consecutive dashes behind
+        // (ex: "tom & jerry" -> "tom-&-jerry" -> "tom--jerry")
+        var allowed = Regex.Replace(slug, @"[^a-z0-9\-]", string.Empty);
 
-        // remove any unallowed characters
-        return Regex.Replace(slugNoExtraDashes, @"[^a-zA-Z0-9_\-]", string.Empty);
+        // remove consecutive dashes, and any leading / trailing dashes
+        return Regex.Replace(allowed, @"-{2,}", "-").Trim('-');
     }
 }
