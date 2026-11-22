@@ -37,7 +37,7 @@ class MediaScaler
                     results.Add(await _photoScaler.Scale(category, srcFile, scaleDir, scale));
                     break;
                 case MediaType.Video:
-                    results.Add(await _videoScaler.Scale(category, srcFile, scaleDir, scale));
+                    results.Add(await _videoScaler.Scale(category, srcFile, scaleDir, scale, file.VideoDuration));
                     break;
             }
         }

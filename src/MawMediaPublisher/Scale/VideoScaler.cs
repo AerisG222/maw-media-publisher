@@ -7,13 +7,14 @@ namespace MawMediaPublisher.Scale;
 class VideoScaler
 {
     ExifExporter _exifExporter = new();
-    DurationInspector _durationInspector = new DurationInspector();
+    DurationInspector _durationInspector = new();
 
     public async Task<ScaledFile> Scale(
         Category category,
         FileInfo src,
         string dstDir,
-        ScaleSpec scale
+        ScaleSpec scale,
+        float? duration
     )
     {
         var dstFilename = $"{Path.GetFileNameWithoutExtension(src.Name)}{(scale.IsPoster ? ".poster.avif" : ".mp4")}";
@@ -23,7 +24,7 @@ class VideoScaler
         // see if it exists as we may be trying to reprocess
         if (!dst.Exists)
         {
-            await ScaleVideo(src, dst, scale);
+            await ScaleVideo(src, dst, scale, duration);
         }
 
         try
@@ -34,7 +35,7 @@ class VideoScaler
         {
             // if file existed, it was corrput, so lets try again
             File.Delete(dst.FullName);
-            await ScaleVideo(src, dst, scale);
+            await ScaleVideo(src, dst, scale, duration);
             exif = await _exifExporter.Export(dst);
         }
 
@@ -50,11 +51,11 @@ class VideoScaler
         );
     }
 
-    async Task ScaleVideo(FileInfo src, FileInfo dst, ScaleSpec scale)
+    async Task ScaleVideo(FileInfo src, FileInfo dst, ScaleSpec scale, float? duration)
     {
         using var cmd = Cli
             .Wrap("ffmpeg")
-            .WithArguments(await GetFfmpegArgs(src.FullName, dst.FullName, scale))
+            .WithArguments(await GetFfmpegArgs(src.FullName, dst.FullName, scale, duration))
             .ExecuteAsync();
 
         await cmd;
@@ -63,7 +64,7 @@ class VideoScaler
     // https://trac.ffmpeg.org/wiki/Encode/AV1#SVT-AV1
     // https://www.ffmpeg.org/ffmpeg-all.html#scale-1
     // https://evilmartians.com/chronicles/better-web-video-with-av1-codec
-    async Task<IEnumerable<string>> GetFfmpegArgs(string src, string dst, ScaleSpec scale)
+    async Task<IEnumerable<string>> GetFfmpegArgs(string src, string dst, ScaleSpec scale, float? duration)
     {
         List<string> args = [
             "-i", src,
@@ -103,9 +104,10 @@ class VideoScaler
 
         if (scale.IsPoster)
         {
-            var duration = await _durationInspector.Inspect(new FileInfo(src));
+            // use the duration already captured for the media file, only probe if it wasn't provided
+            duration ??= await _durationInspector.Inspect(new FileInfo(src));
 
-            if(duration > 2)
+            if (duration > 2)
             {
                 args.AddRange([
                     "-ss", "00:00:02",
