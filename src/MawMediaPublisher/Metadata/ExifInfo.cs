@@ -210,14 +210,35 @@ public class ExifInfo
             ? v
             : default;
 
+        if (valElem.ValueKind != JsonValueKind.String)
+        {
+            return DateTime.MinValue;
+        }
+
+        var val = valElem.GetString();
+
+        // dates w/ an offset (ex: quicktime dates converted to local time: 2025:10:03 19:44:35-04:00) - use the local
+        // wall clock time, to match photo exif dates which do not include an offset
         if (
-            valElem.ValueKind == JsonValueKind.String &&
+            DateTimeOffset.TryParseExact(
+                val,
+                "yyyy:MM:dd HH:mm:sszzz",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AllowWhiteSpaces,
+                out var dto
+            )
+        )
+        {
+            return dto.DateTime;
+        }
+
+        if (
             DateTime.TryParseExact(
-                valElem.GetString(),
+                val,
                 "yyyy:MM:dd HH:mm:ss",
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.AllowWhiteSpaces,
-                out DateTime dt
+                out var dt
             )
         )
         {

@@ -20,6 +20,9 @@ class ExifExporter
                 "-quiet",
                 "-groupHeadings",
                 "-long",
+                // quicktime (mp4 / mov) dates are stored in UTC, while photo exif dates are local.  this has exiftool
+                // convert quicktime dates to local time (w/ an offset) so videos and photos sort correctly together
+                "-api", "QuickTimeUTC",
                 file.FullName
             ])
             .ExecuteBufferedAsync();
