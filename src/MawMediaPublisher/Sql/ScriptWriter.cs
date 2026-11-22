@@ -75,6 +75,7 @@ class ScriptWriter
                     --port 5432 \
                     --username postgres \
                     --dbname maw_media \
+                    --set ON_ERROR_STOP=1 \
                     --file "{{file}}"
             """);
 

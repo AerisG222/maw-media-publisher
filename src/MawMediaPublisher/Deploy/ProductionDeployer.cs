@@ -29,7 +29,7 @@ public class ProductionDeployer
 
     static void EnsureRemoteAssetYearDirectoryExists(Category category, SshClient client)
     {
-        using var cmd = client.RunCommand($"mkdir -p '{category.RemoteYearPath}'");
+        RunRemote(client, $"mkdir -p {ShellQuote(category.RemoteYearPath)}", "Create remote year directory");
     }
 
     static async Task CopyAssetsToRemote(Category category)
@@ -48,11 +48,45 @@ public class ProductionDeployer
 
     static void ApplySqlScripts(Category category, SshClient client)
     {
-        var script = Path.GetFileName(category.ScriptFile);
-        var sql = Path.GetFileName(category.SqlFile);
+        var dir = ShellQuote(category.RemoteMediaPath);
+        var script = ShellQuote(Path.GetFileName(category.ScriptFile));
+        var sql = ShellQuote(Path.GetFileName(category.SqlFile));
 
-        using var cmd1 = client.RunCommand($"cd {category.RemoteMediaPath} && ./{script} prod");
-        using var cmd2 = client.RunCommand($"cd {category.RemoteMediaPath} && rm {script}");
-        using var cmd3 = client.RunCommand($"cd {category.RemoteMediaPath} && rm {sql}");
+        // the import script runs psql w/ ON_ERROR_STOP, so a failed import returns a non-zero exit status.  if it
+        // fails, leave the script and sql on the server so the import can be fixed / re-run manually.
+        RunRemote(client, $"cd {dir} && ./{script} prod", "Production SQL import", category.RemoteMediaPath);
+        RunRemote(client, $"cd {dir} && rm {script} {sql}", "Remove import script and sql");
     }
+
+    static void RunRemote(SshClient client, string command, string description, string? retryDir = null)
+    {
+        using var cmd = client.RunCommand(command);
+
+        if (!string.IsNullOrWhiteSpace(cmd.Error))
+        {
+            AnsiConsole.MarkupLineInterpolated($"[bold yellow] {description} - StdErr: [/][yellow]{cmd.Error}[/]");
+        }
+
+        if (cmd.ExitStatus == 0)
+        {
+            return;
+        }
+
+        AnsiConsole.MarkupLineInterpolated($"[bold red]** {description} failed (exit status {cmd.ExitStatus}) **[/]");
+
+        if (!string.IsNullOrWhiteSpace(cmd.Result))
+        {
+            AnsiConsole.MarkupLineInterpolated($"[bold yellow] StdOut: [/][yellow]{cmd.Result}[/]");
+        }
+
+        if (retryDir != null)
+        {
+            AnsiConsole.MarkupLineInterpolated($"[bold yellow]** The import script and sql were left in {retryDir} so the import can be re-run manually. **[/]");
+        }
+
+        throw new ApplicationException($"{description} failed on the remote server (exit status {cmd.ExitStatus})");
+    }
+
+    // wrap in single quotes for the remote shell, escaping any single quotes in the value
+    internal static string ShellQuote(string value) => $"'{value.Replace("'", "'\\''")}'";
 }
