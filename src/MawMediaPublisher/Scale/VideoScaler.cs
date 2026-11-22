@@ -117,8 +117,13 @@ class VideoScaler
             ]);
         }
 
+        // preset 6 / crf 35 tested against svt-av1 defaults (preset 8 / crf 35) on 1080p source: same size,
+        // better vmaf (esp worst frames), ~1.9x encode time.  -g 240 = keyframe every ~8-10s for seeking.
         args.AddRange([
             "-c:v", "libsvtav1",
+            "-preset", "6",
+            "-crf", "35",
+            "-g", "240",
             "-movflags", "+faststart",
             dst
         ]);
