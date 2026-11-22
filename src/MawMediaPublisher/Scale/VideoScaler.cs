@@ -76,12 +76,10 @@ class VideoScaler
 
     static async Task ScaleVideo(FileInfo src, FileInfo dst, ScaleSpec scale)
     {
-        using var cmd = Cli
+        await Cli
             .Wrap("ffmpeg")
             .WithArguments(GetFfmpegArgs(src.FullName, dst.FullName, scale))
-            .ExecuteAsync();
-
-        await cmd;
+            .ExecuteWithErrorsAsync();
     }
 
     // posters are produced by extracting a single (lossless) frame and then scaling that like a photo, rather than
@@ -96,12 +94,10 @@ class VideoScaler
 
         try
         {
-            using var cmd = Cli
+            await Cli
                 .Wrap("ffmpeg")
                 .WithArguments(GetFrameExtractArgs(src.FullName, frame, duration > 2))
-                .ExecuteAsync();
-
-            await cmd;
+                .ExecuteWithErrorsAsync();
 
             await AvifWriter.Write(frame, posters, AvifWriter.POSTER_QUALITY);
         }
@@ -114,6 +110,8 @@ class VideoScaler
     static IEnumerable<string> GetFrameExtractArgs(string src, string dst, bool skipIntro)
     {
         List<string> args = [
+            "-hide_banner",
+            "-loglevel", "error",
             "-y"
         ];
 
@@ -142,6 +140,8 @@ class VideoScaler
     static IEnumerable<string> GetFfmpegArgs(string src, string dst, ScaleSpec scale)
     {
         List<string> args = [
+            "-hide_banner",
+            "-loglevel", "error",
             "-i", src,
             "-map_metadata", "-1"
         ];

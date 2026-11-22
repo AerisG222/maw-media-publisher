@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using MawMediaPublisher.Archive;
 using MawMediaPublisher.Deploy;
@@ -18,6 +19,7 @@ internal sealed class FullProcessCommand
     const int STATUS_USER_CANCELLED = 1;
     const int STATUS_DESTINATION_EXISTS = 2;
     const int STATUS_FILE_CLASH = 3;
+    const int STATUS_PROCESSING_FAILED = 4;
 
     static readonly MediaFinder _mediaFinder = new();
     static readonly ExifExporter _exifExporter = new();
@@ -134,7 +136,14 @@ internal sealed class FullProcessCommand
 
         category.Media = foundFiles.Media;
 
-        await ProcessCategoryMedia(category);
+        var failures = await ProcessCategoryMedia(category);
+
+        if (failures.Count > 0)
+        {
+            PrintFailures(failures);
+
+            return STATUS_PROCESSING_FAILED;
+        }
 
         AnsiConsole.MarkupLine("[yellow]** All files have been processed.  Please review to make sure they came out as expected.[/]");
 
@@ -164,8 +173,13 @@ internal sealed class FullProcessCommand
         return STATUS_SUCCESS;
     }
 
-    static async Task ProcessCategoryMedia(Category category)
+    // processes all media, returning any failures.  a failure for one file does not stop the others, so all problems
+    // can be reported (and fixed) at once.  sql is only generated when everything succeeded.  outputs that were
+    // successfully created are kept, so re-running after fixing the failed files only processes what is missing.
+    static async Task<IReadOnlyList<(MediaFile Media, Exception Error)>> ProcessCategoryMedia(Category category)
     {
+        var failures = new ConcurrentBag<(MediaFile Media, Exception Error)>();
+
         await AnsiConsole.Progress()
             .Columns(new TaskDescriptionColumn(), new ProgressBarColumn(), new PercentageColumn(), new SpinnerColumn())
             .StartAsync(async ctx =>
@@ -187,7 +201,14 @@ internal sealed class FullProcessCommand
                 {
                     token.ThrowIfCancellationRequested();
 
-                    await ProcessMedia(category, media);
+                    try
+                    {
+                        await ProcessMedia(category, media);
+                    }
+                    catch (Exception ex)
+                    {
+                        failures.Add((media, ex));
+                    }
 
                     lock (_lock)
                     {
@@ -195,8 +216,30 @@ internal sealed class FullProcessCommand
                     }
                 });
 
-                await GenerateSql(category);
+                if (failures.IsEmpty)
+                {
+                    await GenerateSql(category);
+                }
             });
+
+        return failures
+            .OrderBy(f => f.Media.OriginalFilepath, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    static void PrintFailures(IReadOnlyList<(MediaFile Media, Exception Error)> failures)
+    {
+        OutputHeader("Processing Failures");
+
+        AnsiConsole.MarkupLineInterpolated($"[bold red]!!** {failures.Count} file(s) could not be processed.  Nothing has been deployed.  Please fix or remove these and run again (completed files will not be reprocessed). **!![/]");
+        AnsiConsole.WriteLine();
+
+        foreach (var (media, error) in failures)
+        {
+            AnsiConsole.MarkupLineInterpolated($"[bold red]  {Path.GetFileName(media.OriginalFilepath)}[/]");
+            AnsiConsole.MarkupLineInterpolated($"[red]    {error.Message}[/]");
+            AnsiConsole.WriteLine();
+        }
     }
 
     static async Task ProcessMedia(Category category, MediaFile file)
@@ -208,6 +251,12 @@ internal sealed class FullProcessCommand
         if (file.Exif == null)
         {
             throw new ApplicationException("Exif data is required!");
+        }
+
+        // without dimensions we can't choose which scales to produce (and would silently only produce 'full')
+        if (file.Exif.Width <= 0 || file.Exif.Height <= 0)
+        {
+            throw new InvalidDataException("Unable to read the dimensions (width / height) from the exif data - the file may be truncated or corrupt");
         }
 
         // resolve now while the file is still in its original location (it is moved during the local deploy)

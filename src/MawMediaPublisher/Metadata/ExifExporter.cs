@@ -25,13 +25,15 @@ class ExifExporter
                 "-api", "QuickTimeUTC",
                 file.FullName
             ])
+            // exiftool returns non-zero when it can't read a file, but reports why in the json (see GetError)
+            .WithValidation(CommandResultValidation.None)
             .ExecuteBufferedAsync();
 
         var cmdResult = await cmd;
 
         if (string.IsNullOrWhiteSpace(cmdResult.StandardOutput))
         {
-            throw new InvalidDataException($"Unable to read json from exiftool for: {file.FullName}");
+            throw new InvalidDataException($"Unable to read json from exiftool for: {file.FullName} (exit code {cmdResult.ExitCode}): {CommandExtensions.Tail(cmdResult.StandardError)}");
         }
 
         var exif = JsonDocument.Parse(cmdResult.StandardOutput);
@@ -48,14 +50,38 @@ class ExifExporter
                 throw new ApplicationException($"Only expected a single result when parsing exif for: {file.FullName}.  Count was: {exif.RootElement.EnumerateArray().Count()}");
             }
 
-            return new ExifInfo(exif.RootElement.EnumerateArray().First());
+            var element = exif.RootElement.EnumerateArray().First();
+
+            ThrowIfError(file, element);
+
+            return new ExifInfo(element);
         }
 
         if (exif.RootElement.ValueKind == JsonValueKind.Object)
         {
+            ThrowIfError(file, exif.RootElement);
+
             return new ExifInfo(exif.RootElement);
         }
 
         throw new ApplicationException($"Did not find expected json result when parsing exif for: {file.FullName}");
+    }
+
+    // when exiftool can't read a file (ex: corrupt / not really the type its extension says), it reports this as
+    // ExifTool:Error rather than on stderr
+    static void ThrowIfError(FileInfo file, JsonElement element)
+    {
+        if (
+            element.TryGetProperty("ExifTool", out var group) &&
+            group.ValueKind == JsonValueKind.Object &&
+            group.TryGetProperty("Error", out var error)
+        )
+        {
+            var message = error.ValueKind == JsonValueKind.Object && error.TryGetProperty("val", out var val)
+                ? val.ToString()
+                : error.ToString();
+
+            throw new InvalidDataException($"exiftool could not read {file.Name}: {message}");
+        }
     }
 }

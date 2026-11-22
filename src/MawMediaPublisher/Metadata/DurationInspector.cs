@@ -17,6 +17,8 @@ class DurationInspector
                 "-v", "quiet",
                 "-of", "csv=p=0"
             ])
+            // a failure produces no output, which is reported below w/ the file name
+            .WithValidation(CommandResultValidation.None)
             .ExecuteBufferedAsync();
 
         var result = await cmd;
@@ -24,7 +26,7 @@ class DurationInspector
 
         if (string.IsNullOrWhiteSpace(output))
         {
-            throw new InvalidDataException($"Expected to get duration from ffprobe for {src.FullName}");
+            throw new InvalidDataException($"Expected to get duration from ffprobe for {src.FullName} (exit code {result.ExitCode})");
         }
 
         if (float.TryParse(output, NumberStyles.Float, CultureInfo.InvariantCulture, out var duration))

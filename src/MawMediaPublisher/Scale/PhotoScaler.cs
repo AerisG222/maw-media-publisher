@@ -63,12 +63,10 @@ class PhotoScaler
 
             if (!Path.Exists(tif))
             {
-                using var rt = Cli
+                await Cli
                     .Wrap("rawtherapee-cli")
                     .WithArguments(GetRawTherapeeArgs(src.FullName, tif))
-                    .ExecuteAsync();
-
-                await rt;
+                    .ExecuteWithErrorsAsync();
             }
 
             src = new FileInfo(tif);

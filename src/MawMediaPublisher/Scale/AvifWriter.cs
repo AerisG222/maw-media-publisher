@@ -16,12 +16,10 @@ static class AvifWriter
 
     public static async Task Write(string src, IReadOnlyList<ScaleTarget> targets, int quality)
     {
-        using var cmd = Cli
+        await Cli
             .Wrap("magick")
             .WithArguments(GetImageMagickArgs(src, targets, quality))
-            .ExecuteAsync();
-
-        await cmd;
+            .ExecuteWithErrorsAsync();
     }
 
     // https://usage.imagemagick.org/resize/
