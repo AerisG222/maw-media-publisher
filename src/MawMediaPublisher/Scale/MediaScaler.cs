@@ -25,21 +25,58 @@ class MediaScaler
             origFile.Length
         ));
 
-        foreach (var scale in scales)
+        // the max-fit scale (largest scale the media already fits within) has the same dimensions as 'full', so
+        // rather than encoding it again, defer it and copy the 'full' output once that has been produced
+        var fullResults = new Dictionary<bool, ScaledFile>();
+        var deferred = new List<(int Index, ScaleSpec Scale)>();
+
+        foreach (var (scale, isMaxFit) in scales)
         {
+            if (isMaxFit)
+            {
+                deferred.Add((results.Count + deferred.Count, scale));
+                continue;
+            }
+
             var scaleDir = Path.Combine(origDir.FullName, scale.Code);
 
             CreateDir(scaleDir);
 
-            switch (file.MediaType)
+            var result = file.MediaType switch
             {
-                case MediaType.Image:
-                    results.Add(await _photoScaler.Scale(category, srcFile, scaleDir, scale));
-                    break;
-                case MediaType.Video:
-                    results.Add(await _videoScaler.Scale(category, srcFile, scaleDir, scale, file.VideoDuration));
-                    break;
+                MediaType.Image => await _photoScaler.Scale(category, srcFile, scaleDir, scale),
+                MediaType.Video => await _videoScaler.Scale(category, srcFile, scaleDir, scale, file.VideoDuration),
+                _ => throw new InvalidOperationException($"Unexpected media type: {file.MediaType}")
+            };
+
+            results.Add(result);
+
+            if (scale.Width == int.MaxValue)
+            {
+                fullResults[scale.IsPoster] = result;
             }
+        }
+
+        // insert in original scale order so the results look the same as before
+        foreach (var (index, scale) in deferred)
+        {
+            var full = fullResults[scale.IsPoster];
+            var filename = Path.GetFileName(full.Path);
+            var fullFile = Path.Combine(origDir.FullName, full.Scale.Code, filename);
+            var scaleDir = Path.Combine(origDir.FullName, scale.Code);
+            var dst = Path.Combine(scaleDir, filename);
+
+            CreateDir(scaleDir);
+            File.Copy(fullFile, dst, true);
+
+            results.Insert(index, new ScaledFile(
+                Guid.CreateVersion7(),
+                scale,
+                category.BuildMediaFilePath(scale, filename),
+                full.Width,
+                full.Height,
+                full.Bytes
+            ));
         }
 
         // cleanup any intermediary tif files when processing raw files
@@ -56,7 +93,7 @@ class MediaScaler
         return results;
     }
 
-    static IEnumerable<ScaleSpec> GetScalesForDimensions(int width, int height, bool includePosters)
+    static IEnumerable<(ScaleSpec Scale, bool IsMaxFit)> GetScalesForDimensions(int width, int height, bool includePosters)
     {
         string? maxScaleCode = null;
 
@@ -70,22 +107,22 @@ class MediaScaler
             // keep 'full' size which will be used for downloads
             if (scale.Width == int.MaxValue)
             {
-                yield return scale;
+                yield return (scale, false);
                 continue;
             }
 
             // if either dimension is greater than the scale bounds, scale it
             if (width > scale.Width || height > scale.Height)
             {
-                yield return scale;
+                yield return (scale, false);
             }
             else if (maxScaleCode == null || string.Equals(scale.Code, maxScaleCode))
             {
                 maxScaleCode = scale.Code;
 
                 // if we are here, the item fits in the scale bounds, return this last scale so that we can keep the
-                // highest res that fits
-                yield return scale;
+                // highest res that fits.  it will match the 'full' dimensions, so it gets copied from 'full'
+                yield return (scale, true);
             }
         }
     }
