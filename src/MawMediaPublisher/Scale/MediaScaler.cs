@@ -4,6 +4,10 @@ namespace MawMediaPublisher.Scale;
 
 class MediaScaler
 {
+    // videos up to this size are decoded once and all scales are encoded at the same time.  larger videos (ex: 4k)
+    // use too much memory when all encoders run at once, so their scales are encoded one at a time
+    const long MAX_SINGLE_DECODE_PIXELS = 1920 * 1080;
+
     readonly PhotoScaler _photoScaler = new();
     readonly VideoScaler _videoScaler = new();
 
@@ -48,7 +52,7 @@ class MediaScaler
         {
             // photos are scaled to all sizes in a single pass so the source is only decoded once
             MediaType.Image => await _photoScaler.Scale(category, srcFile, origDir.FullName, toScale),
-            MediaType.Video => await _videoScaler.Scale(category, srcFile, origDir.FullName, toScale, file.VideoDuration),
+            MediaType.Video => await _videoScaler.Scale(category, srcFile, origDir.FullName, toScale, file.VideoDuration, (long)width * height <= MAX_SINGLE_DECODE_PIXELS),
             _ => throw new InvalidOperationException($"Unexpected media type: {file.MediaType}")
         };
 

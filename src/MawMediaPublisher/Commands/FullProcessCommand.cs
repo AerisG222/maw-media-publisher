@@ -21,6 +21,9 @@ internal sealed class FullProcessCommand
     const int STATUS_FILE_CLASH = 3;
     const int STATUS_PROCESSING_FAILED = 4;
 
+    const int MAX_PARALLEL_PHOTOS = 10;
+    const int MAX_PARALLEL_VIDEOS = 2;
+
     static readonly MediaFinder _mediaFinder = new();
     static readonly ExifExporter _exifExporter = new();
     static readonly DurationInspector _durationInspector = new();
@@ -188,33 +191,23 @@ internal sealed class FullProcessCommand
 
                 task.MaxValue = category.Media.Count();
 
-                // from the migration app:
-                // when processing highest res image to full hi res destination, we kept crashing
-                // as we ran out of mem - for a single run, it looks like 1 image can take upwards of 5gb,
-                // so set max parallelism to 12 to try and stay below our sys mem (currently 64gb)
-                var opts = new ParallelOptions
-                {
-                    MaxDegreeOfParallelism = 12
-                };
+                // photos and videos are processed concurrently w/ separate limits to keep memory in check.
+                //
+                // from the migration app: when processing highest res image to full hi res destination, we kept
+                // crashing as we ran out of mem - for a single run, it looks like 1 image can take upwards of 5gb.
+                // video encodes also use a lot of memory (a 4k full size encode is ~10gb, 1080p videos encode all
+                // scales at once at ~4.5gb), so only a couple run at a time.  the largest videos are started first so
+                // a big video is not left running by itself at the end.  (total parallelism stays at 12)
+                var videos = category.Media
+                    .Where(m => m.MediaType == MediaType.Video)
+                    .OrderByDescending(m => new FileInfo(m.OriginalFilepath).Length);
+                var photos = category.Media
+                    .Where(m => m.MediaType != MediaType.Video);
 
-                await Parallel.ForEachAsync(category.Media, opts, async (media, token) =>
-                {
-                    token.ThrowIfCancellationRequested();
-
-                    try
-                    {
-                        await ProcessMedia(category, media);
-                    }
-                    catch (Exception ex)
-                    {
-                        failures.Add((media, ex));
-                    }
-
-                    lock (_lock)
-                    {
-                        task.Increment(1);
-                    }
-                });
+                await Task.WhenAll(
+                    ProcessMediaBatch(category, videos, MAX_PARALLEL_VIDEOS, task, failures),
+                    ProcessMediaBatch(category, photos, MAX_PARALLEL_PHOTOS, task, failures)
+                );
 
                 if (failures.IsEmpty)
                 {
@@ -225,6 +218,39 @@ internal sealed class FullProcessCommand
         return failures
             .OrderBy(f => f.Media.OriginalFilepath, StringComparer.Ordinal)
             .ToList();
+    }
+
+    static async Task ProcessMediaBatch(
+        Category category,
+        IEnumerable<MediaFile> media,
+        int maxParallel,
+        ProgressTask task,
+        ConcurrentBag<(MediaFile Media, Exception Error)> failures
+    )
+    {
+        var opts = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = maxParallel
+        };
+
+        await Parallel.ForEachAsync(media, opts, async (file, token) =>
+        {
+            token.ThrowIfCancellationRequested();
+
+            try
+            {
+                await ProcessMedia(category, file);
+            }
+            catch (Exception ex)
+            {
+                failures.Add((file, ex));
+            }
+
+            lock (_lock)
+            {
+                task.Increment(1);
+            }
+        });
     }
 
     static void PrintFailures(IReadOnlyList<(MediaFile Media, Exception Error)> failures)
