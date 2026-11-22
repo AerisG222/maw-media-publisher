@@ -98,7 +98,7 @@ class SqlWriter
                 ) VALUES (
                     {SqlAsString(media.Id)},
                     {SqlMediaType(media.MediaType)},
-                    {SqlDate(media.Exif!.CreateDate)},
+                    {SqlDate(media.CreateDate)},
                     {SqlAsString(ADMIN_ID)},
                     {SqlDate(NOW)},
                     {SqlAsString(ADMIN_ID)},

@@ -204,6 +204,9 @@ internal sealed class FullProcessCommand
             throw new ApplicationException("Exif data is required!");
         }
 
+        // resolve now while the file is still in its original location (it is moved during the local deploy)
+        file.CreateDate = MediaFile.ResolveCreateDate(file.Exif, origFile);
+
         if (file.MediaType == MediaType.Video)
         {
             file.VideoDuration = await _durationInspector.Inspect(origFile);
