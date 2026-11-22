@@ -12,7 +12,8 @@ class MediaScaler
         var results = new List<ScaledFile>();
         var srcFile = new FileInfo(file.FilepathToProcess);
         var origDir = srcFile.Directory!;
-        var scales = GetScalesForDimensions(file.Exif!.Width, file.Exif.Height, file.MediaType == MediaType.Video);
+        var (width, height) = GetDisplayDimensions(file);
+        var scales = GetScalesForDimensions(width, height, file.MediaType == MediaType.Video);
 
         var origFile = new FileInfo(file.OriginalFilepath);
 
@@ -20,8 +21,8 @@ class MediaScaler
             Guid.CreateVersion7(),
             ScaleSpec.Src,
             category.BuildMediaFilePath(ScaleSpec.Src, origFile.Name),
-            file.Exif.Width,
-            file.Exif.Height,
+            width,
+            height,
             origFile.Length
         ));
 
@@ -92,6 +93,19 @@ class MediaScaler
         }
 
         return results;
+    }
+
+    // exif reports the stored (unrotated) dimensions, but ffmpeg applies the rotation when encoding, so use the
+    // displayed dimensions when choosing scales.  otherwise portrait phone videos (stored as 1920x1080 w/ a 90
+    // rotation) look like they fit full-hd and get a full size copy, and never get a qhd scale.
+    internal static (int Width, int Height) GetDisplayDimensions(MediaFile file)
+    {
+        var exif = file.Exif!;
+        var rotation = ((exif.Rotation % 360) + 360) % 360;
+
+        return file.MediaType == MediaType.Video && (rotation == 90 || rotation == 270)
+            ? (exif.Height, exif.Width)
+            : (exif.Width, exif.Height);
     }
 
     static IEnumerable<(ScaleSpec Scale, bool IsMaxFit)> GetScalesForDimensions(int width, int height, bool includePosters)

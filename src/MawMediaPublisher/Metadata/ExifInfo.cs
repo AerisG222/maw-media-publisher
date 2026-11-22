@@ -10,6 +10,8 @@ public class ExifInfo
     const string TAG_CREATE_DATE = "CreateDate";
     const string TAG_GPS_LATITUDE = "GPSLatitude";
     const string TAG_GPS_LONGITUDE = "GPSLongitude";
+    const string GROUP_COMPOSITE = "Composite";
+    const string TAG_ROTATION = "Rotation";
 
     public JsonElement Json { get; init; }
     int _height = int.MinValue;
@@ -50,6 +52,28 @@ public class ExifInfo
             _width = GetIntFromVal(FindFirstPropertyByName(Json, TAG_IMAGE_WIDTH));
 
             return _width;
+        }
+    }
+
+    // rotation for videos (derived by exiftool from the track's display matrix).  phones often store portrait videos
+    // as landscape frames w/ a 90 / 270 rotation, which ffmpeg applies when encoding.  0 when not present.
+    public int Rotation
+    {
+        get
+        {
+            if (
+                Json.ValueKind == JsonValueKind.Object &&
+                Json.TryGetProperty(GROUP_COMPOSITE, out var composite) &&
+                composite.ValueKind == JsonValueKind.Object &&
+                composite.TryGetProperty(TAG_ROTATION, out var rotation)
+            )
+            {
+                var val = GetIntFromVal(rotation);
+
+                return val == int.MinValue ? 0 : val;
+            }
+
+            return 0;
         }
     }
 
