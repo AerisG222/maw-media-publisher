@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using Amazon.Runtime;
 using Amazon.Runtime.CredentialManagement;
 using Amazon.S3;
-using Amazon.S3.Model;
+using Amazon.S3.Transfer;
 using CliWrap;
 using MawMediaPublisher.Models;
 using MawMediaPublisher.Scale;
@@ -19,12 +19,21 @@ class AwsS3Archiver
     const string S3_BUCKET = "mikeandwan-us-assets";
 
     AmazonS3Client? _client;
+    TransferUtility? _transfer;
 
     public void Authenticate()
     {
         var ssoCreds = LoadSsoCredentials(SSO_CREDS);
 
         _client = new AmazonS3Client(ssoCreds);
+
+        // TransferUtility uses multipart uploads for larger files (> 16MB by default), which is required for
+        // files over 5GB (the limit for a single PutObject) and retries individual parts on failure.  several
+        // files are archived in parallel, so keep the per-file part concurrency modest.
+        _transfer = new TransferUtility(_client, new TransferUtilityConfig
+        {
+            ConcurrentServiceRequests = 4
+        });
     }
 
     public async Task ArchiveMedia(Category category, MediaFile media)
@@ -41,14 +50,14 @@ class AwsS3Archiver
 
     async Task ArchiveFile(Category category, string localFilePath)
     {
-        if (_client == null)
+        if (_transfer == null)
         {
             throw new ApplicationException("You must first authenticate with AWS before trying to archive media!");
         }
 
         var key = $"{category.EffectiveDate.Year}/{category.BaseDirectoryName}/{Path.GetFileName(localFilePath)}";
 
-        var putRequest = new PutObjectRequest
+        var uploadRequest = new TransferUtilityUploadRequest
         {
             BucketName = S3_BUCKET,
             Key = key,
@@ -56,7 +65,7 @@ class AwsS3Archiver
             StorageClass = S3StorageClass.DeepArchive
         };
 
-        await _client.PutObjectAsync(putRequest);
+        await _transfer.UploadAsync(uploadRequest);
     }
 
     static AWSCredentials LoadSsoCredentials(string profile)
